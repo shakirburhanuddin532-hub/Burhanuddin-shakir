@@ -25,6 +25,7 @@
   --ease-out: cubic-bezier(0.19, 1, 0.22, 1);
   --ease-io: cubic-bezier(0.76, 0, 0.24, 1);
   --radius: 4px;
+  color-scheme: dark;
 }
 
 *, *::before, *::after { box-sizing: border-box; }

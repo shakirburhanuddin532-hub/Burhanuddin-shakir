@@ -26,6 +26,7 @@
   let time = 0;
 
   /* ---------- preloader ---------- */
+  document.body.classList.add('is-loading');
   const preloader = $('#preloader');
   (function runPreloader() {
     const countEl = $('#preloaderCount'), barEl = $('#preloaderBar');
