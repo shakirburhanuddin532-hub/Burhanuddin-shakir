@@ -40,8 +40,8 @@ export function HeroScene() {
   return (
     <section ref={ref} id="hero" className="scene" aria-labelledby="hero-title">
       <div className="scene-pin">
-        <div className="intro-hidden container-x grid h-full grid-cols-12 items-center gap-6 pt-[var(--nav-h)]">
-          <div className="hero-copy col-span-12 flex flex-col gap-7 lg:col-span-7">
+        <div className="intro-hidden container-x grid h-full grid-cols-12 content-center gap-5 pt-[var(--nav-h)] lg:items-center lg:gap-6">
+          <div className="hero-copy order-2 col-span-12 flex flex-col gap-6 lg:order-1 lg:col-span-7 lg:gap-7">
             <p className="eyebrow">{COPY.hero.eyebrow}</p>
             <h1 id="hero-title" className="display display-xl">
               {COPY.hero.h1[0]}
@@ -58,11 +58,11 @@ export function HeroScene() {
               </a>
             </div>
           </div>
-          <div className="hero-logo col-span-12 flex justify-center lg:col-span-5 lg:justify-end">
-            <Logo height={isDesktop ? 420 : 200} priority className="drop-shadow-[0_20px_60px_rgba(0,0,0,0.6)]" />
+          <div className="hero-logo order-1 col-span-12 flex justify-start lg:order-2 lg:col-span-5 lg:justify-end">
+            <Logo height={isDesktop ? 420 : 150} priority className="drop-shadow-[0_20px_60px_rgba(0,0,0,0.6)]" />
           </div>
         </div>
-        <div className="hero-hint absolute bottom-8 left-1/2 flex -translate-x-1/2 flex-col items-center gap-2" aria-hidden="true">
+        <div className="hero-hint absolute bottom-8 left-1/2 hidden -translate-x-1/2 flex-col items-center gap-2 lg:flex" aria-hidden="true">
           <span className="label text-[10px]">{COPY.hero.scroll}</span>
           <span className="block h-6 w-px bg-gradient-to-b from-cyan to-transparent" />
         </div>

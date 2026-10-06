@@ -3,10 +3,9 @@ import { gsap } from '@/animations/motion/gsap'
 import { stepAt, type DemoProps } from './demoTypes'
 
 const WEEKS = [12, 18, 23, 31, 38, 52, 61, 74]
-const chartPath = (() => {
-  const pts = WEEKS.map((v, i) => `${10 + i * 11.4},${90 - v}`)
-  return `M${pts.join(' L')}`
-})()
+const CX = (i: number) => 24 + i * 38
+const CY = (v: number) => 92 - v * 0.9
+const chartPath = `M${WEEKS.map((v, i) => `${CX(i)},${CY(v)}`).join(' L')}`
 
 /** §18 — one idea carried through eight connected stages on one stage. */
 export default function BusinessDemo({ tl, ready, reduced }: DemoProps) {
@@ -134,16 +133,16 @@ export default function BusinessDemo({ tl, ready, reduced }: DemoProps) {
 
         <div className="b-analytics absolute inset-0" style={{ opacity: 0 }}>
           <span className="label text-[9px] text-mist-40">Analytics · weekly sign-ups (illustrative)</span>
-          <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="mt-2 h-[240px] w-full" aria-hidden="true">
-            <line x1="10" y1="90" x2="92" y2="90" stroke="var(--color-slate)" strokeWidth="0.5" />
-            <path className="b-line" d={chartPath} fill="none" stroke="var(--world-build)" strokeWidth="1.2" pathLength={1} strokeDasharray={1} strokeDashoffset={1} vectorEffect="non-scaling-stroke" />
+          <svg viewBox="0 0 320 110" preserveAspectRatio="xMidYMid meet" className="mt-2 h-[240px] w-full" aria-hidden="true">
+            <line x1="16" y1="92" x2="304" y2="92" stroke="var(--color-slate)" strokeWidth="0.8" />
+            <path className="b-line" d={chartPath} fill="none" stroke="var(--world-build)" strokeWidth="1.6" pathLength={1} strokeDasharray={1} strokeDashoffset={1} />
             {WEEKS.map((v, i) => (
               <g key={i} className="b-pt" style={{ opacity: 0 }}>
-                <circle cx={10 + i * 11.4} cy={90 - v} r="1.4" fill="#F2F1EC" />
-                <text x={10 + i * 11.4} y={96} fontSize="3.2" fill="#A7ABB4" textAnchor="middle">
+                <circle cx={CX(i)} cy={CY(v)} r="2.2" fill="#F2F1EC" />
+                <text x={CX(i)} y={103} fontSize="7" fill="#A7ABB4" textAnchor="middle" fontFamily="JetBrains Mono, monospace">
                   w{i + 1}
                 </text>
-                <text x={10 + i * 11.4} y={90 - v - 4} fontSize="3" fill="#7EA2F5" textAnchor="middle">
+                <text x={CX(i)} y={CY(v) - 6} fontSize="7" fill="#7EA2F5" textAnchor="middle" fontFamily="JetBrains Mono, monospace">
                   {v}
                 </text>
               </g>

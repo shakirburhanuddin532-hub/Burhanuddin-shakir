@@ -101,9 +101,18 @@ export function DemoChapter({
     if (!el) return
     let alive = true
     const ctx = gsap.context(() => {
-      if (env && engine && !reduced) {
+      if (env && engine && !reduced && mode === 'scrub') {
         const proxy = { p: 0 }
         tl.to(proxy, { p: 1, duration: entry.steps.length, onUpdate: () => alive && engine.setBlend(env.from, env.to, proxy.p, false, env.order) }, 0)
+      }
+      if (env && engine && !reduced && mode !== 'scrub') {
+        ScrollTrigger.create({
+          trigger: el,
+          start: 'top bottom',
+          end: 'top top',
+          scrub: 0.4,
+          onUpdate: (self) => alive && engine.setBlend(env.from, env.to, self.progress, false, env.order),
+        })
       }
       if (env && engine && reduced) {
         ScrollTrigger.create({
@@ -185,7 +194,7 @@ export function DemoChapter({
             </p>
           </header>
           <DemoFrame world={world} className="min-h-[380px] lg:min-h-[520px]">
-            <div className="h-full min-h-[380px] w-full p-4 sm:p-6 lg:min-h-[520px]">
+            <div className="flex h-full min-h-[380px] w-full flex-col p-4 sm:p-6 lg:min-h-[520px] [&>*]:flex-1">
               {visible ? (
                 <Suspense fallback={<div className="label p-6 opacity-60">Preparing demonstration…</div>}>
                   <Component tl={tl} mode={mode} profile={profile} reduced={reduced} ready={ready} />

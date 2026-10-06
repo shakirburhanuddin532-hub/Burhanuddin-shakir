@@ -207,7 +207,7 @@ function DetailDemo({ feature }: { feature: Feature }) {
       <section className="flex flex-col gap-4" aria-label="Demonstration">
         <DemoSteps steps={entry.steps} active={step} world={feature.world} />
         <DemoFrame world={feature.world} className="min-h-[360px]">
-          <div className="h-full min-h-[360px] p-4 sm:p-6">
+          <div className="flex h-full min-h-[360px] flex-col p-4 sm:p-6 [&>*]:flex-1">
             <Suspense fallback={<div className="label p-6 opacity-60">Preparing demonstration…</div>}>
               <Component tl={tl} mode="stepped" profile={profile} reduced={reduced} ready={ready} />
             </Suspense>

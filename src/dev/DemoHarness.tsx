@@ -51,7 +51,7 @@ function Inner({ demoKey, initial }: { demoKey: string; initial: number }) {
       <DemoSteps steps={entry.steps} active={step} world={world} />
       <StepControl count={entry.steps.length} active={step} onChange={setStep} />
       <DemoFrame world={world} className="min-h-[520px]">
-        <div className="h-full min-h-[520px] p-6">
+        <div className="flex h-full min-h-[520px] flex-col p-6 [&>*]:flex-1">
           <Suspense fallback={<p className="label">Loading…</p>}>
             <Component tl={tl} mode="stepped" profile={profile} reduced={reduced} ready={ready} />
           </Suspense>
