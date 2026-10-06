@@ -1,0 +1,370 @@
+@import 'tailwindcss';
+
+/* ------------------------------------------------------------------
+   SHAKIR AI design tokens
+   Colors measured from the official faceted logo (crown gold, hand hues)
+   on a graphite ground. Layout: one fixed canvas environment behind
+   pinned, scrolled scenes; DOM text always above the geometry.
+------------------------------------------------------------------ */
+@theme {
+  --color-ink: #07080a;
+  --color-graphite: #121418;
+  --color-charcoal: #1c1f25;
+  --color-slate: #2a2e36;
+  --color-mist: #f2f1ec;
+  --color-mist-60: #a7abb4;
+  --color-mist-40: #6f737b;
+
+  --color-cyan: #5ec4e0;
+  --color-teal: #3fa99b;
+  --color-gold: #d9b26a;
+  --color-amber: #e0923a;
+  --color-peach: #e8a07a;
+  --color-magenta: #c8508f;
+  --color-violet: #7a4fd1;
+  --color-blue: #3b6ce6;
+  --color-crown: #c9a24f;
+  --color-trust: #b9c2cc;
+
+  --color-gold-text: #e8c77e;
+  --color-amber-text: #f2b35c;
+  --color-teal-text: #6fd6c8;
+  --color-blue-text: #7ea2f5;
+  --color-violet-text: #b49af0;
+  --color-magenta-text: #e884b8;
+  --color-trust-text: #cdd4dc;
+
+  --font-display: 'Sora', 'Manrope', system-ui, sans-serif;
+  --font-body: 'Manrope', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
+
+  --ease-out-shakir: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+:root {
+  color-scheme: dark;
+  --world-center: var(--color-gold);
+  --world-create: var(--color-amber);
+  --world-learn: var(--color-teal);
+  --world-build: var(--color-blue);
+  --world-act: var(--color-violet);
+  --world-human: var(--color-magenta);
+  --world-trust: var(--color-trust);
+  --world-center-text: var(--color-gold-text);
+  --world-create-text: var(--color-amber-text);
+  --world-learn-text: var(--color-teal-text);
+  --world-build-text: var(--color-blue-text);
+  --world-act-text: var(--color-violet-text);
+  --world-human-text: var(--color-magenta-text);
+  --world-trust-text: var(--color-trust-text);
+  --nav-h: 72px;
+}
+
+html {
+  background: var(--color-ink);
+  -webkit-text-size-adjust: 100%;
+}
+body {
+  margin: 0;
+  background: var(--color-ink);
+  color: var(--color-mist);
+  font-family: var(--font-body);
+  font-weight: 400;
+  line-height: 1.55;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+body.scroll-locked {
+  overflow: hidden;
+}
+
+::selection {
+  background: var(--color-gold);
+  color: var(--color-ink);
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-mist);
+  outline-offset: 4px;
+  border-radius: 2px;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@layer components {
+/* ---------- Typography ---------- */
+.font-display {
+  font-family: var(--font-display);
+}
+.eyebrow {
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-size: 11px;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--color-gold);
+}
+.display {
+  font-family: var(--font-display);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 0.98;
+  text-transform: uppercase;
+  text-wrap: balance;
+}
+.display-xl {
+  font-size: clamp(40px, 7.2vw, 108px);
+}
+.display-lg {
+  font-size: clamp(32px, 5vw, 72px);
+}
+.display-md {
+  font-size: clamp(26px, 3.2vw, 44px);
+}
+.lede {
+  font-size: clamp(16px, 1.25vw, 19px);
+  line-height: 1.6;
+  color: var(--color-mist-60);
+  max-width: 34rem;
+}
+.mono {
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+.label {
+  font-family: var(--font-display);
+  font-size: 11px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--color-mist-60);
+}
+
+/* ---------- Buttons (faceted corners echo the logo) ---------- */
+.btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 48px;
+  padding: 0 28px;
+  font-family: var(--font-display);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  text-decoration: none;
+  clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
+  transition:
+    background-color 0.4s var(--ease-out-shakir),
+    color 0.4s var(--ease-out-shakir),
+    transform 0.4s var(--ease-out-shakir);
+  cursor: pointer;
+  border: 0;
+}
+.btn-primary {
+  background: var(--color-gold);
+  color: var(--color-ink);
+}
+.btn-primary:hover {
+  background: var(--color-gold-text);
+}
+.btn-ghost {
+  background: rgba(242, 241, 236, 0.04);
+  color: var(--color-mist);
+  box-shadow: inset 0 0 0 1px var(--color-slate);
+}
+.btn-ghost:hover {
+  box-shadow: inset 0 0 0 1px var(--color-mist-60);
+}
+.btn:active {
+  transform: translateY(1px);
+}
+
+/* ---------- Layout ---------- */
+.container-x {
+  width: 100%;
+  max-width: 1440px;
+  margin-inline: auto;
+  padding-inline: clamp(20px, 4vw, 64px);
+}
+.scene {
+  position: relative;
+  z-index: 10;
+}
+.scene-pin {
+  position: relative;
+  height: 100svh;
+  overflow: hidden;
+}
+.panel {
+  background: rgba(18, 20, 24, 0.72);
+  box-shadow: inset 0 0 0 1px var(--color-slate);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+.hairline {
+  height: 1px;
+  background: var(--color-slate);
+}
+.scrim {
+  background: radial-gradient(ellipse at center, rgba(7, 8, 10, 0.75) 0%, rgba(7, 8, 10, 0.4) 55%, transparent 80%);
+}
+
+/* fixed environment overlays (fog + vignette), above the canvas, below content */
+.fog {
+  pointer-events: none;
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  background:
+    linear-gradient(to top, #07080a 0%, transparent 38%),
+    radial-gradient(ellipse at 50% 40%, transparent 55%, rgba(7, 8, 10, 0.6) 100%);
+}
+
+/* ---------- Faceted gem (SVG) ---------- */
+.gem {
+  display: block;
+}
+.gem-btn {
+  background: none;
+  border: 0;
+  padding: 0;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+}
+
+}
+
+/* ---------- Motion safety ---------- */
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+}
+
+@layer components {
+/* ---------- Intro gating ---------- */
+.intro-hidden {
+  transition: opacity 0.9s var(--ease-out-shakir);
+}
+html[data-intro='running'] .intro-hidden {
+  opacity: 0;
+}
+
+/* ---------- Feature universe ---------- */
+.fu-node {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  width: 120px;
+  text-align: center;
+}
+.fu-node .gem-wrap {
+  transition: transform 0.26s var(--ease-out-shakir), filter 0.3s;
+}
+.fu-node .fu-name {
+  font-family: var(--font-display);
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  color: rgba(242, 241, 236, 0.6);
+  transition: color 0.2s, transform 0.22s var(--ease-out-shakir);
+}
+.fu-node .fu-blurb {
+  position: absolute;
+  top: calc(100% + 2px);
+  left: 50%;
+  transform: translateX(-50%) translateY(4px);
+  width: 240px;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--color-mist-60);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.22s 0.08s, transform 0.22s 0.08s var(--ease-out-shakir);
+  background: rgba(7, 8, 10, 0.86);
+  padding: 8px 10px;
+  box-shadow: inset 0 0 0 1px var(--color-slate);
+}
+.fu-node.is-active .gem-wrap {
+  transform: scale(1.25);
+}
+.fu-node.is-active .fu-name {
+  color: var(--color-mist);
+}
+.fu-node.is-active .fu-blurb {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+.fu-node.is-linked .gem-wrap {
+  transform: scale(1.1);
+  filter: brightness(1.15);
+}
+.fu-node.is-linked .fu-name {
+  color: var(--color-mist);
+}
+.fu-node.is-dim {
+  opacity: 0.42;
+}
+.fu-link {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  transition: stroke-dashoffset 0.45s var(--ease-out-shakir), opacity 0.3s;
+  opacity: 0;
+}
+.fu-link.is-on {
+  stroke-dashoffset: 0;
+  opacity: 1;
+}
+
+/* ---------- Dialog ---------- */
+dialog.feature-dialog {
+  background: transparent;
+  border: 0;
+  padding: 0;
+  max-width: none;
+  max-height: none;
+  width: 100%;
+  height: 100%;
+  color: inherit;
+}
+dialog.feature-dialog::backdrop {
+  background: rgba(7, 8, 10, 0.86);
+  backdrop-filter: blur(12px);
+}
+
+/* ---------- Pipeline ---------- */
+.pipe-conn {
+  position: relative;
+  background: var(--color-slate);
+  overflow: hidden;
+}
+.pipe-conn::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, var(--color-cyan), var(--color-violet));
+  transform-origin: left;
+  transform: scaleX(var(--fill, 0));
+}
+.pipe-conn.vertical::after {
+  background: linear-gradient(180deg, var(--color-cyan), var(--color-violet));
+  transform-origin: top;
+  transform: scaleY(var(--fill, 0));
+}
+}

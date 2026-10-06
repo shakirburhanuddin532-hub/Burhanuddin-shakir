@@ -1,0 +1,120 @@
+{
+  "verdict": "Section E is unusually specific and most of it is traceable to the logo (the hue-walk ramp, graphite-majority surface, hairline seams, the pedestal field, the faceted icon lattice), and its contrast arithmetic checks out (I recomputed mist/graphite 16.3:1, amber 7.3:1, blue 3.9:1). But three load-bearing claims are false or infeasible as written: (1) the \"interim cutout\" of the source PNG cannot be done losslessly \u2014 the backdrop is a 234\u2013251 gradient with a soft contact shadow under the base (to y\u22481018) and the plate's top face sits at \u2248225, so an alpha key fringes or eats the plate, and the stated crop (x 306\u2013882, y 30\u20131000) clips the base plate (which reaches x\u2248893) \u2014 shipping that violates \u00a702; (2) the shared-vertex mesh model (`pos: N\u00b73`, \"morph is purely per-vertex\") is incompatible with the per-triangle rotation, FRAGMENTS offsets and NETWORK \"enlarged node triangles\" the same section promises; (3) \"prefix of a Bridson sampling order\" is not a uniform subset (Bridson grows outward from a seed), uniform Poisson sampling gives no facet-size gradient, and a Delaunay of a superset is not a refinement of the subset \u2014 so the depth cue, the profile-downgrade coherence and the \"poster is the live mesh\" identity all rest on a sampler that does not behave as described. Beyond those, the ramp orientation puts cyan on the right (the logo is cool on the left), gold is used far beyond \u00a703's \"occasional\", per-frame React props violate \u00a722, mobile recomposition (\u00a724) is absent, the hero state has zero translucency despite \u00a701/\u00a705, and several numbers (depth units, probe timing, icon stroke at 24 px, phone budgets) would stall a builder. With the fixes below the section is sound and distinctly Shakir; without them Milestones 1\u20133 would be built on a model that has to be rewritten.",
+  "issues": [
+    {
+      "severity": "blocker",
+      "problem": "E.6 interim logo handling violates \u00a702 (do not distort / change proportions). Measured: the backdrop is not flat #EDEDED but a gradient from (237,237,237) at the top to (247\u2013251) at the bottom-left, with a soft contact shadow under the base plate running to y\u22481018; the plate's lit top face is \u2248(225,225,223), within 4\u201320 levels of the surrounding backdrop; the plate extends to x\u2248893 on rows 969\u2013981, so the stated crop x 306\u2013882 cuts ~11 px off the plate, and the crop at y 1000 cuts the shadow mid-gradient. A 'lossless alpha key of the flat backdrop' is therefore impossible: it either leaves a grey fringe on every edge and a grey smear under the base, or removes part of the plate. Also `aspect-ratio: 576 / 970` is hard-coded from this damaged crop, so the client's real asset (different padding) will not fit the reserved box.",
+      "fix": "Delete the interim cutout entirely. Interim rule: the source PNG is shown only uncut, inside a deliberately designed light 'plinth' tile \u2014 `background: #EDEDED`, `border-radius: 24px`, crop x 290\u2013920 \u00d7 y 20\u20131024 (630\u00d71004; keeps plate and shadow, excludes the watermark at x\u2248940\u20131000, y\u2248953\u2013981) \u2014 used in nav (as a 40 px tile), loading screen and footer only. Hero, IntroSequence (mask-image light pass), ShakirOne lens and Final CTA are declared blocked on client asset (1) transparent PNG 2048\u00b2 and (2) SVG master; list that dependency in Milestone 1 week 1 and in section M. `Logo` reads intrinsic width/height from the asset (next/image `width`/`height` from import metadata) and sets `aspect-ratio` from them; never hard-code 576/970."
+    },
+    {
+      "severity": "blocker",
+      "problem": "E.3 mesh model is internally infeasible. `SceneState.pos` is a shared-vertex array (N\u00b73) and the blend is 'purely per-vertex \u2026 no reindexing', yet E.1/E.3 require operations that only work on unshared corners: idle per-triangle rotation about centroids (HIGH), FRAGMENTS 'each triangle offset along its radial vector and rotated \u00b118\u00b0', NETWORK 'node triangles enlarged'. With shared vertices a triangle cannot move independently of its neighbours; rotating/offsetting per triangle opens gaps between facets and is not representable in `pos`.",
+      "fix": "Store corner positions unshared: `SceneState.cpos: Float32Array // T\u00b79 (x,y,z per corner)` (2,400\u00d79\u00d74 B = 86 KB per state, 690 KB for 8 states at HIGH \u2014 acceptable). Generators that are landscape-like (MOUNTAIN, UNIVERSE, ONE_CORE, INTERFACE) write shared-vertex positions and scatter them into `cpos`; FRAGMENTS, NETWORK and the idle rotation write `cpos` directly. The frame is `cpos = mix(a.cpos, b.cpos, e)` \u2014 still a lerp with identical lengths. Keep `points`/`tris` in `MeshTopology` only for Delaunay, centroids and banding. Rewrite the memory figure (\u2248 0.9 MB at HIGH) and the per-frame op count accordingly."
+    },
+    {
+      "severity": "blocker",
+      "problem": "E.3 point-set and E.5 identity rest on three false claims: (a) 'points [0,300) are the LOW set, [0,620) MEDIUM' \u2014 a prefix of a Bridson Poisson-disc sequence is a connected blob growing from the seed point, not uniform coverage, so LOW/downgrade meshes would cover a patch of the viewport; (b) uniform-radius Poisson sampling produces near-equal triangle areas, so 'band by facet area tercile' cannot yield the 2.5\u20134 / 4.5\u20137 / 8\u201312 vh size bands of E.1 (the stated primary depth cue) and 'tercile' also contradicts the 50/35/15 split; (c) the Delaunay triangulation of a superset is not a subdivision of the subset's triangulation, so 'facets subdivide; nothing jumps' on poster\u2192canvas and on profile downgrade is untrue.",
+      "fix": "(a)+(b) Use a nested, density-graded sampler in `lib/lowpoly/sample.ts`: a depth field `D(x,y) \u2208 [0,1]` per state family (for MOUNTAIN: 1 at the horizon band 50\u201362 vh, 0 at the bottom edge), radius `r = lerp(rFront, rBack, D)` with (rFront, rBack) = (10 vh, 3 vh) at HIGH, (13, 4.5) MEDIUM, (18, 6) LOW; generate LOW first, then run Bridson for MEDIUM seeded with the LOW points as the initial active list, then HIGH seeded with MEDIUM \u2014 each level is a uniform superset of the previous (true nested refinement). Assign `band` from `D` at the centroid (D > 0.66 BACK, > 0.33 MID, else FRONT) and tune thresholds to the 50/35/15 share. (c) Drop the 'nothing jumps' claim; keep the 300 ms crossfade and state honestly that colour continuity (centroid-based) is preserved while edges re-triangulate. If a true subdivision is later wanted, note `cdt2d` (constrained Delaunay, \u2248 8 KB gz) as the only path, not `delaunator`."
+    },
+    {
+      "severity": "major",
+      "problem": "E.1 ramp orientation is reversed relative to the logo. `u = atan2(cy \u2212 hy, cx \u2212 hx)/2\u03c0 + seedOffset` puts u = 0 (cyan) at angle 0, i.e. to the RIGHT of the hub in canvas coordinates, whereas the logo is cool on the LEFT (thumb, left finger), gold at the TOP (crown), red/magenta on the RIGHT and violet/blue at the BOTTOM. An unspecified `seedOffset` that varies with `seed` would also rotate the rainbow per seed, destroying the 'logo order' rule this whole section is built on.",
+      "fix": "Fix the orientation and remove the seed from it: `u = (atan2(cy \u2212 hy, cx \u2212 hx) / 2\u03c0 + 0.5 + 0.06\u00b7noise(centroid)) mod 1` in canvas (y-down) coordinates, which gives left = 0.00 cyan, top = 0.25, right = 0.50, bottom = 0.75. Then move the ramp stops to match the logo's quadrants: cyan 0.00 \u2192 teal 0.10 \u2192 gold 0.22 \u2192 amber 0.33 \u2192 peach 0.42 \u2192 magenta 0.52 \u2192 violet 0.70 \u2192 blue 0.88 \u2192 wrap. `seed` affects noise only, never the ramp phase. Update the per-world slice table to the new stop values."
+    },
+    {
+      "severity": "major",
+      "problem": "Gold overuse contradicts \u00a703 ('occasional peach/gold', 'warm amber'). The draft makes gold/crown-gold the hub core, the ONE_CORE inner ring, the 24/12-facet lens, the ground reflection under the logo, the beam arrival colour, the eyebrow-label text colour, the BUILD & GROW primary, and HUMAN's secondary \u2014 gold is the most-seen accent on the page, which also pushes toward 'generic premium-tech' gold-on-black.",
+      "fix": "Reserve gold strictly for logo-adjacent moments: ShakirOne lens, SYMBOL ring, beam arrival at the crown, ground reflection. Everywhere else: eyebrow labels use `--mist-60`; BUILD & GROW = amber primary / gold secondary with the gold capped at 30 % of that world's accent facets; HUMAN = peach primary / amber secondary (no gold). Add a one-line rule to E.2: 'gold may appear in at most one element per viewport outside ShakirOne and the Final CTA'."
+    },
+    {
+      "severity": "major",
+      "problem": "\u00a724 'Mobile: do NOT simply shrink desktop. Recompose scenes' is not addressed in scope. E only changes facet edge lengths and caps the profile; the state generators carry a `viewport` argument but no portrait composition rules: MOUNTAIN horizon at 58 vh and 'valley under the logo footprint' assume the desktop right-5/12 logo; INTERFACE snaps to a 12-column grid (impossible at 390 px); UNIVERSE's 6 rings and ONE_CORE's 1.9\u00d7/2.6\u00d7 orbits are landscape radii; the hub position on portrait is never given.",
+      "fix": "Add a 'portrait composition' column to the state table (breakpoint: `aspect < 1`): MOUNTAIN hub at (0.5, 0.36) under the centred logo, horizon 44 vh, valley 1.3\u00d7 logo width centred; FRAGMENTS/NETWORK hub (0.5, 0.45); INTERFACE 4-column grid, 2 stacked panels; UNIVERSE ring radii 0.18/0.26/0.34/0.42/0.50/0.58 \u00d7 vw (desktop uses \u00d7 vh); ENGINE spiral centre (0.5, 0.5); ONE_CORE orbits 1.6\u00d7/2.2\u00d7 mark height; SYMBOL ring radius 0.40 \u00d7 vw. Tablet (768\u20131024) uses the desktop composition at MEDIUM. Posters' mobile crop is generated from the portrait composition, not a crop of the desktop one."
+    },
+    {
+      "severity": "major",
+      "problem": "\u00a722 'no unnecessary React rerenders' is violated by the LowPolyScene API: `state: { from, to, t }` and `beam: { headX, headY, u, width }` are React props that change every frame during a scrubbed scroll (60\u00d7/s), re-rendering the component tree; ShakirBeam 'reports back to LowPolyScene every frame' and 'reads beamPath from the current blended state' with no interface for either direction.",
+      "fix": "Split the API: static config stays as props (`intensity`, `density`, `depth`, `motion`, `palette`, `interactive`, `performanceLevel`, `seed`, `poster`, `logoExclusion`, callbacks). Per-frame data goes through an imperative handle: `export type LowPolySceneHandle = { setProgress(from: SceneStateName, to: SceneStateName, t: number): void; setBeam(b: BeamState | null): void; setTextSafeZones(z: Rect[]): void; getBeamPath(): Float32Array; getHub(): [number, number]; }` exposed via `useImperativeHandle`; SceneController holds the ref and calls it from the ScrollTrigger `onUpdate`; ShakirBeam receives the same ref. Define `Rect = { x: number; y: number; w: number; h: number } // viewport fractions`, `BeamState = { headX: number; headY: number; u: number }` (drop unused `width`) and `MeshFrame`."
+    },
+    {
+      "severity": "major",
+      "problem": "The hero state has none of the 'layered translucent triangles / crystalline surfaces' (\u00a701) or 'refract light' (\u00a705): translucency is allowed only in FRAGMENTS, UNIVERSE and ENGINE, so MOUNTAIN \u2014 the most-viewed state and the first impression \u2014 is fully opaque, and 'refraction' is reduced to the beam's 600 ms tint.",
+      "fix": "Allow a small crystalline set in MOUNTAIN: \u2264 40 FRONT-band accent facets within 1.6\u00d7 the logo width of the hub at alpha 0.72, `source-over`, with the 2-layer rule unchanged; on MEDIUM \u2264 16, LOW/REDUCED_MOTION none. Add a static 'refraction' cue independent of the beam: facets whose quantised normal is within 18\u00b0 of the key light get a second, 20 %-lighter sub-facet (a split along the longest edge) \u2014 computed once per state, no per-frame cost."
+    },
+    {
+      "severity": "major",
+      "problem": "Perf claims are unverified and the phone budget is missing. '\u2248 13 k float ops' at HIGH ignores per-triangle normals (\u2248 48 k ops), beam distance (\u2248 24 k), shatter noise per vertex per frame (\u2248 125 k if noise is evaluated live) and per-triangle sin/cos \u2014 the real figure is 300\u2013600 k ops. 'Measured budgets ~12\u201320 ms' for SVG and '4\u20136 ms / \u2248 9 ms' for Canvas are presented as measurements but are estimates. The frame-cost row covers only the reference laptop; MEDIUM \u2014 the profile every phone gets \u2014 has no phone figure, and 'mid-range phone at 60 fps' is the claim that matters.",
+      "fix": "Reword all numbers as estimates and make them Milestone 3 exit criteria. Name reference devices: laptop = MacBook Air M1 / 8th-gen i5 UHD 620; phone = Galaxy A14 (Mali-G52) and iPhone 11, both at MEDIUM, 390\u00d7844, DPR 1.25. Add a column 'Typical frame cost (reference phone)': MEDIUM \u2264 8 ms, LOW \u2264 4 ms, with a hard gate 'MEDIUM p75 \u2264 12 ms on Galaxy A14 while scrubbing'. Precompute the per-vertex shatter noise once (`shatterSeed: Float32Array N`) so only `sin(e\u00b7\u03c0)` is per frame; store per-triangle rotation phase and use a 256-entry sin LUT."
+    },
+    {
+      "severity": "major",
+      "problem": "The grain overlay (`mix-blend-mode: overlay` over a canvas repainting every frame) forces an extra full-viewport compositing pass with blending on every frame; on MEDIUM this is every phone, where blend-mode layers over a live canvas are a known jank source. Also a grain layer above text would alter text colour.",
+      "fix": "Grain on HIGH only. Implement it inside the canvas as the last draw call of a frame (`ctx.globalAlpha = 0.035; ctx.fillStyle = grainPattern; ctx.fillRect(...)`) \u2014 one call, no CSS blend layer \u2014 and remove `mix-blend-mode` from the plan. Specify the layer stack explicitly: canvas (facets, particles, grain) \u2192 CSS fog gradient \u2192 ShakirBeam SVG \u2192 logo/text (with scrims) \u2192 CSS vignette."
+    },
+    {
+      "severity": "major",
+      "problem": "The 1-second frame-time probe runs 300\u20131,300 ms after `onReady`, i.e. during IntroSequence's fragments/assembly phase, concurrent with hydration, font loading and poster image decode; p75 > 20 ms in that window will downgrade perfectly capable devices, and the resulting topology rebuild + 400 ms crossfade would occur mid-cinematic.",
+      "fix": "Probe window = 600\u20131,600 ms after `onReady` AND after `document.fonts.ready`, sampling only frames where no React commit occurred (flag via a `useEffect` counter). Use p50 > 20 ms (one level) / p50 > 34 ms (two levels). Never rebuild during the intro: queue the downgrade and apply it at the intro\u2192hero dissolve (section F's 300 ms overlay), where the crossfade is invisible."
+    },
+    {
+      "severity": "major",
+      "problem": "Posters (and therefore the entire REDUCED_MOTION experience and the no-JS page) are generated at the LOW set (300 points \u2248 560 triangles). On a 1920\u00d71080 desktop that is \u2248 110 px median edges \u2014 far coarser than the live MID band (40\u201363 px) \u2014 so reduced-motion users get a visibly cruder brand, and the first-paint \u2192 canvas handoff shows an obvious refinement pop on every HIGH desktop load.",
+      "fix": "Generate desktop posters at the MEDIUM set (620 points; SVG \u2248 35 KB gz) and mobile posters at LOW; REDUCED_MOTION on desktop uses the MEDIUM plates. Keep the AVIF LCP raster at MEDIUM too (\u2248 90 KB). State the drift-guard comparison per set."
+    },
+    {
+      "severity": "major",
+      "problem": "Two named states are geometrically unsound with a fixed Delaunay topology: INTERFACE 'vertices snap to a 12-column grid forming 3 panel rectangles' turns most of 1,250 points into collinear sets, producing thousands of zero-area slivers whose hairline seams stack into solid dark lines; SYMBOL 'all vertices collapse to a 12-facet ring' stacks ~2,400 triangles at the same pixels (overdraw + seams = a dark blob) unless alpha-0 triangles are skipped, which is not stated.",
+      "fix": "INTERFACE: snap vertices to the grid with \u00b13 px jitter and set `alpha = 0` for any triangle whose area falls below 15 % of its MOUNTAIN area; the three panel outlines are drawn by ShakirBeam's SVG, not by the mesh. SYMBOL: only the 24 ring-adjacent triangles get positions on the ring; all others keep their ONE_CORE positions and go alpha \u2192 0. Add a renderer rule: triangles with alpha < 0.02 are skipped before batching, and degenerate triangles (area < 1 px\u00b2) are never stroked."
+    },
+    {
+      "severity": "major",
+      "problem": "E.7 icon spec is not drawable at 24 px: a 1.5 px seam on a 4 px lattice pitch leaves \u2248 2.5 px of fill per facet, so 5\u201311 facets with three fill tiers and one 'lit facet' become stroke mush; this also contradicts E.6's own finding that 'facets become noise below 40 px'.",
+      "fix": "Two artwork levels per glyph: `size=24` uses lattice pitch 5 px (4 rows \u00d7 8 cells), 3\u20136 facets, 1 px seam, two tiers only (one lit facet + charcoal); `size=48` uses the full spec (pitch 8 px, 5\u201311 facets, 1.5 px seam, three tiers). Export both as paths in the same component behind a `size` prop (\u2248 0.7 KB each)."
+    },
+    {
+      "severity": "major",
+      "problem": "Ambiguity about how many LowPolyScene instances exist. E.3 says 'one rAF per scene', E.5 says 'every other scene's <noscript> holds its state poster', while \u00a706's continuous morph and the keyframe table imply one pinned full-viewport canvas for the home journey. This decides how textSafeZones, logoExclusion, posters and IntersectionObserver gating work, and other sections (D, F, J) cannot interface without it.",
+      "fix": "State it: the home route has exactly one pinned, full-viewport LowPolyScene (`position: fixed; inset: 0; z-index: 0`) owned by SceneController; sections scroll over it and update `setTextSafeZones`/`logoExclusion` via the handle per section. Secondary LowPolyScene instances exist only on feature-detail routes and the 404, each with its own poster. The IntersectionObserver gating applies to those secondary instances only."
+    },
+    {
+      "severity": "major",
+      "problem": "\u00a705 'triangles should subtly rotate' is delivered on HIGH only; because `pointer: coarse \u2192 MEDIUM` and `hardwareConcurrency \u2264 4 \u2192 MEDIUM`, every tablet (including iPad Pro), every phone and many laptops never see facets rotate \u2014 the rotation is cheap (it is part of the same corner lerp once `cpos` exists) so the cut is unjustified.",
+      "fix": "Per-triangle rotation on HIGH (\u00b11.5\u00b0) and MEDIUM (\u00b11.0\u00b0, 0.08 Hz, updated at 30 Hz); off on LOW; zero in REDUCED_MOTION."
+    },
+    {
+      "severity": "minor",
+      "problem": "`depth` prop: 'Scales z range (0\u20130.35 vh of displacement)' is a unit error \u2014 0.35 vh is \u2248 3 px. Beam lift radius '140 px' and lens/orbit sizes are absolute px on a system otherwise specified in vh.",
+      "fix": "Write `depth` as 'z range 0\u20130.35 \u00d7 viewport height (0\u2013315 px at 900 px tall)'. Express the beam lift radius as 14 vh (desktop) / 11 vh (mobile), and the `lighter` cap as the nearest 24 facets."
+    },
+    {
+      "severity": "minor",
+      "problem": "Accent-field formula is underspecified: `noise(centroid\u00b7k)` has no `k`; 'ridged fBm correlated with the state's z-field' does not say how; the specular test needs a view vector that is never defined.",
+      "fix": "`accentField = 0.6\u00b7ridge(z_centroid) + 0.4\u00b7fbm3(centroid \u00d7 3.5, seed)`; a facet is accent iff `accentField > 1 \u2212 accentShare`. Specular: `V = (0, 0, 1)`, `H = normalize(L + V)`, lift when `acos(n\u00b7H) < 10\u00b0`."
+    },
+    {
+      "severity": "minor",
+      "problem": "Icon concepts are largely stock iconography (padlock, megaphone, open book, clapper, speech bubble, head-and-shoulders, shield-with-check) \u2014 the lattice makes them a family, but the ideas could sit in any icon set; only the crown notch ties to the logo.",
+      "fix": "Derive at least six glyphs from the mark itself: Chat AI = the V-sign's two raised facets with the speech tail; Agent AI = the crown's five points as a 5-stub node; Human Talent AI = the open palm's thumb facet over the base plate; Automation AI = the V repeated as a zig-zag; Privacy & Security = the base plate as a closed slab with the crown notch; Truth & Verify = a single raised finger facet with the beam slash. Keep the others but drop the megaphone (use three widening beam lines)."
+    },
+    {
+      "severity": "minor",
+      "problem": "Profile heuristic details: `navigator.getBattery` is deprecated and Chromium-only; 'viewport area \u00d7 DPR > 4.5 MP' mixes units (CSS area \u00d7 DPR\u00b2); `prefers-reduced-motion` is read once and persisted in `sessionStorage`, so a user toggling the OS setting mid-session is ignored; the 'Enable motion' override lives in the footer, which a reduced-motion user on a long cinematic page may never reach.",
+      "fix": "Drop the battery check. Use `cssWidth \u00d7 cssHeight \u00d7 DPR\u00b2 > 4.5 MP`. Subscribe to `matchMedia('(prefers-reduced-motion: reduce)').addEventListener('change', \u2026)` and re-run `pickProfile` on change. Expose the motion toggle in the nav/skip overlay as well as the footer (coordinate with section K)."
+    },
+    {
+      "severity": "minor",
+      "problem": "DPR cap 1.5 on HIGH means a Retina laptop (DPR 2) renders at 75 % and upscales; the `1/DPR px` seam becomes a 0.67 px anti-aliased stroke that shimmers against the \u00b12 px breathing.",
+      "fix": "HIGH DPR cap = 2 when `cssArea \u00d7 DPR\u00b2 \u2264 4.5 MP`, else 1.5; seam width = `max(1, 1/DPR)` device px, drawn on half-pixel-aligned coordinates."
+    },
+    {
+      "severity": "minor",
+      "problem": "Drift guard 'pixel diff \u2264 1 %' between a Canvas raster and a browser-rendered SVG will fail on anti-aliasing differences along ~2,000 hairline seams, and the posters are listed as Milestone 1 deliverables although they depend on the Milestone 3 state generators.",
+      "fix": "Compare per-triangle: the test asserts identical `(centroid, quantised colour, band)` tuples between the live LOW/MEDIUM frame and the SVG `<polygon>` data, plus an SSIM \u2265 0.97 on the raster. Move `scripts/generate-posters.ts` and `public/posters/*` to Milestone 3; Milestone 1 ships tokens, Logo, icons, grain and a placeholder MOUNTAIN poster."
+    },
+    {
+      "severity": "minor",
+      "problem": "Tokens in `styles/tokens.css` are not bridged to Tailwind, so utility classes and the canvas could still drift; `palette` prop lacks an explicit value for the hub; the LIVE indicator 'pulses by tier change' with no reduced-motion rule; the `--mist` note claims the logo backdrop is warm (it is neutral 237/237/237).",
+      "fix": "`tailwind.config.ts` colours reference the CSS variables (`graphite: 'var(--graphite)'`), and `lib/lowpoly/palette.ts` is generated from `tokens.css` by a script so there is one source. Add `palette: 'full'` as the documented value for CHAT + SHAKIR ONE. LIVE pulse: static tier-A dot under REDUCED_MOTION. Delete the 'warm backdrop' justification for `--mist`."
+    }
+  ]
+}

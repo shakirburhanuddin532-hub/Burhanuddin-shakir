@@ -1,0 +1,150 @@
+{
+  "verdict": "The draft is strong on structure: the \u00a706 chain is honoured scene by scene, the canonical names are used consistently, the single persistent Canvas 2D `LowPolyScene` respects \u00a725, the copy is restrained and mostly \u00a729-clean, and the intercepting-route decision for feature detail is the right call. It fails on arithmetic and interfaces rather than on vision. The constellation does not add up to 21 (Video Search AI has no world and Chat is both the centre and an orbiting node), REDUCED_MOTION is defined for the canvas but not for a 2,440vh of pinned scroll-jacking, the mobile Creation Engine scrubs five beats inside ~420px of scroll, and the intro's mount rule, logo asset budget and hydration path are not buildable as written. Keyboard focus inside pinned scenes and the overlay's inert/focus-trap behaviour are unaddressed, and the Trust copy makes product-behaviour claims nobody has verified. None of these require a redesign; each has a concrete fix below. Fix the blockers and the interface gaps (states, ShakirBeam API, Logo component, node hit-targets) and the section is ready for the other sections to build on.",
+  "issues": [
+    {
+      "severity": "blocker",
+      "problem": "A.6 / A.8 / B.2: the constellation does not add up to 21. A.6 clusters are CREATE 5 + LEARN 3 + BUILD & GROW 3 + ACT 3 + TRUST 4 + HUMAN 1 = 19, plus the centre (Chat) = 20; `video-search-ai` (09) is listed in B.2 under an ad-hoc 'CREATE (search)' row but is absent from the A.6 cluster counts, the '21 spokes to the centre' (a centre cannot spoke to itself), the Tab order 01\u219221, and the A.7 '21-facet ring'. A.8 then puts '21 capability nodes at radius 260px' around a logo core, so Chat is a centre in scene 4 and an orbiting node in scene 6 \u2014 contradicting the canonical 'CHAT + SHAKIR ONE at the center' and \u00a710 'CHAT / SHAKIR ONE connects everything'.",
+      "fix": "Define once in A.0: centre = CHAT + SHAKIR ONE (feature 01 lives in the centre node and is reachable by Tab as item 01); 20 orbiting nodes. Set CREATE = 6 nodes (Image, Video, Video Search, Writing + Document, Website Builder, Code), so clusters = 6+3+3+3+4+1 = 20. Replace '21 spokes' with '20 spokes' in A.6 and A.8, '21-facet ring' with '20-facet ring' in A.7 (the active chapter's facet docks; the centre stage is the 21st, Chat), and in A.8 write '20 capability nodes; the core is Chat + Shakir One'. Remove the 'CREATE (search)' row in B.2 and list `video-search-ai` under CREATE. Keep H2 'TWENTY-ONE CAPABILITIES' (21 includes Chat)."
+    },
+    {
+      "severity": "blocker",
+      "problem": "A.0 defines REDUCED_MOTION only for the canvas ('renders each state once, crossfades 300 ms') and A.2 defines it for the intro, but A.3\u2013A.10 never say what happens to the 2,440vh of pinned, scrubbed scenes, text that appears at '70%' or '85%', typed chat messages, and the FeatureUniverse hold segment when `prefers-reduced-motion` is on. Pinning and scrubbing are scroll-driven motion; leaving them in place violates \u00a704 'reduced-motion alternative' and \u00a723 'reduced-motion support', and a screen-reader user never reaches copy that is rendered at a scrub position.",
+      "fix": "Add 'A.0.1 REDUCED_MOTION layout': `SceneController` creates no pins; every scene flows at content height (hero 100vh, system 100vh, chat auto, universe auto, engine 4 \u00d7 auto, one auto, trust auto, cta 100vh); all copy that the HIGH storyboard reveals by progress is rendered in the DOM at mount and visible; `LowPolyScene` paints the scene's END state once per scene as a static frame (ridge, network, interface, universe, engine, one, calm, symbol) and crossfades 300 ms on IntersectionObserver entry; the chat transcript renders complete; FeatureUniverse is always in its hold state; demos show their final frame with a 'Steps' list in DOM; ShakirBeam is static (a lit 2px segment, no travel). Also state the general rule: scrubbed text is never conditionally rendered \u2014 only `opacity`/`transform` change, never `display`/mounting \u2014 so the full page reads top to bottom with a screen reader in every profile."
+    },
+    {
+      "severity": "blocker",
+      "problem": "A.7 Mobile: 'four separately pinned chapters of 150svh (pin 50svh, demos compressed to five beats)'. 50svh on an 844px phone is 422px of scroll for five beats plus dock and wipe \u2248 60px per beat \u2014 less than one thumb flick (300\u2013600px). The entire Website Builder chapter passes in a single swipe, which contradicts \u00a707 'controlling a cinematic sequence by scrolling' and \u00a713 'believable rather than fake magic'.",
+      "fix": "Choose: mobile chapters are NOT scrubbed. Each chapter is a flowing 110svh block; on 50% visibility an IntersectionObserver plays a time-based GSAP timeline (Website Builder 5.2 s, Code 4.2 s, Image 3.6 s, Automation 3.8 s), pausable by tap, replayable by a 'REPLAY' control, and the step chain is rendered as a DOM list so the beats are readable without the animation. Update the scene table: scene 5 mobile = 4 \u00d7 110svh + 40svh exit = 480svh (flowing); recompute the mobile total (2,250svh) and the pinned/flowing split."
+    },
+    {
+      "severity": "major",
+      "problem": "A.2 Mount rule is not buildable in the App Router as written. `IntroSequence` 'rendered only when sessionStorage[...] is unset' is a client-only decision, so a server-rendered `app/page.tsx` either paints the hero first (flash, then the overlay pops in) or hydrates with a mismatch. Reading `?intro=1` in a server component also opts the home page out of static prerendering. `html { overflow: hidden }` does not reliably lock scroll on iOS Safari.",
+      "fix": "Specify: the overlay is always server-rendered in the HTML with `data-intro=\"pending\"` on `<html>`; a `beforeInteractive` inline script in `app/layout.tsx` (\u2264 400 bytes, wrapped in try/catch for private mode) reads `sessionStorage['shakir.intro.v1']` and `location.search` and sets `data-intro` to `play` or `skip` before first paint; CSS hides the overlay when `skip`. `IntroSequence` is a client component that reads the attribute, never `useSearchParams` (keeps `/` static). Scroll lock = `ScrollTrigger.normalizeScroll(true)` plus `body { position: fixed; inset: 0 }` for the lock window, restored on unlock."
+    },
+    {
+      "severity": "major",
+      "problem": "A.2 'the first 600 ms cover font and logo decode' is an unrealistic promise: the only logo asset in the repo is a 1,276 KB 1024\u00d71024 PNG. On a mid-range phone over 4G that is 2\u20134 s of transfer before decode, so shot 6 would hold at its +1,500 ms cap on most first visits.",
+      "fix": "Add asset budgets to A.0 Logo: client master \u2192 exported by the build to `public/brand/logo-{260,420,520,840}.webp` (and AVIF) at 2\u00d7 of each rendered height, budget \u2264 40 KB for the 520px intro asset and \u2264 90 KB for the 840px hero asset; `<link rel=\"preload\" as=\"image\" imagesrcset>` in `app/layout.tsx` for the intro size only; hero size requested at shot 1 so it is decoded before the FLIP. Wordmark font subset \u2264 30 KB, `font-display: optional`. Change the hold rule to 'if the 520px asset has not decoded by 2,300 ms'."
+    },
+    {
+      "severity": "major",
+      "problem": "Keyboard navigation inside pinned scenes is unaddressed (\u00a723 'every important interaction must work without a mouse'). Tabbing to a hero CTA, a FeatureUniverse node, a Creation Engine exit link or the final CTA buttons makes the browser scroll the focused element into view, which jumps the ScrollTrigger scrub and, during a pin, can land on the pin-spacer rather than the pinned viewport.",
+      "fix": "Add to A.0: all focusable elements inside pinned scenes get a `focusin` handler in `SceneController` that calls `seek(sceneId, beat)` where `beat` is the progress at which the element is fully visible (hero CTAs 0%, universe nodes 64%, engine exit links 96%, final CTAs 90%) and focuses with `{ preventScroll: true }`; the scene's `<section>` gets `tabindex=\"-1\"` so `seek` can move focus to it; `data-beat` attribute on each focusable element is the contract with the motion section."
+    },
+    {
+      "severity": "major",
+      "problem": "B.3 FeatureDetailOverlay has no modal semantics: nothing inert behind it, no focus trap, no scroll lock, and with a pinned home underneath the wheel will keep scrubbing scene 4 while the overlay is open. Related-capability links use `router.push`, so closing after three related hops needs three Backs.",
+      "fix": "Specify `FeatureDetailOverlay`: `role=\"dialog\" aria-modal=\"true\" aria-labelledby=<feature H1>`, `inert` on `#home-root` while open, focus moved to the close button on open and returned to the originating node on close, `ScrollTrigger.getAll().forEach(t => t.disable(false))` + body lock while open, re-enable on close; related links use `router.replace` so one Back/Esc returns to the home scroll position."
+    },
+    {
+      "severity": "major",
+      "problem": "\u00a729: A.9 Trust copy states product behaviour as fact \u2014 'Results are checked before they reach you', 'Shakir shows which capabilities it used and why', 'Actions that change something outside the conversation wait for your approval', 'Offline AI for work that stays on your device'. A.0 calls this 'final draft'. B.1 correctly flags `/security` facts as client-supplied but the home Trust block, which more people read, carries the same unverified claims.",
+      "fix": "Mark the six principle lines and the pipeline sub-labels as 'proposed \u2014 requires client confirmation of behaviour (dependency #2)'; add fallback phrasing that describes design intent rather than guarantee: VERIFICATION 'Truth & Verify and Code AI are built to check work before it is presented.'; TRANSPARENCY 'Shakir is designed to show which capabilities it used.'; USER APPROVAL 'Actions outside the conversation are designed to wait for your approval.' Keep the stronger lines only once the client confirms each in writing."
+    },
+    {
+      "severity": "major",
+      "problem": "A.0 promises 60 fps but never caps canvas resolution or maps phones to a profile. A `position: fixed` full-viewport Canvas 2D at DPR 3 on a 390\u00d7844 phone is 1170\u00d72532 = 2.96 M pixels per frame; fill rate, not triangle count, is what breaks 60 fps on mid-range Android. Tablet is assigned MEDIUM; phones are never assigned anything.",
+      "fix": "Add to A.0: canvas DPR cap HIGH 2, MEDIUM 1.5, LOW 1, REDUCED_MOTION 1; initial profile: desktop HIGH, tablet MEDIUM, phone MEDIUM when `navigator.hardwareConcurrency \u2265 4 && navigator.deviceMemory \u2265 4` else LOW; a frame-time probe during intro shots 2\u20134 (mean > 20 ms over 30 frames) downgrades one level before the hero; profile is frozen after the hero so scenes never re-layout mid-scroll; draw budget \u2264 6 ms/frame per state, verified in the performance section."
+    },
+    {
+      "severity": "major",
+      "problem": "Interface gaps other sections cannot build from: (1) A.0's state contract lists `ridge \u2026 symbol` but the intro shot list uses `points` and `fragments`, which are not states; (2) `setState(state, progress)` does not say what `progress` measures; (3) ShakirBeam is described by behaviour in every scene but has no component path or API (brief \u00a726 reserves `animations/beam/`); (4) \u00a702 requires a reusable Logo component, yet C lists no `Logo` and scenes reference the PNG path directly; (5) FeatureUniverse nodes are canvas polygons with hover/focus/Enter behaviour but no DOM hit-targets are specified.",
+      "fix": "(1) Add states `points` and `fragments` to the contract (intro only). (2) Define `setState(state, t)` as 't = 0\u21921 progress of the transition from the previous state into `state`; t = 1 is the state at rest'. (3) Add `ShakirBeam` at `animations/beam/ShakirBeam.ts` with `run({ path: Path2D | 'ridge' | 'panel' | 'network' | 'ring', duration: ms | 'scrub', head: 160\u2013320, tail: 24, hue?: 'drift' | 'blue' | 'teal' })` returning a GSAP tween, drawn as a layer inside `LowPolyScene`; `maxConcurrent = 2`. (4) Add `components/brand/Logo.tsx` with props `size: 32|40|96|160|200|260|320|420`, `priority`, `alt=\"Shakir AI\"`, and make every scene reference `<Logo>`. (5) Specify 21 `<button>` elements (min 44\u00d744, `aria-describedby` the one-line description) positioned over the nodes from `LowPolyScene.getNodeLayout()`, which the universe state exposes; the canvas remains `aria-hidden`."
+    },
+    {
+      "severity": "major",
+      "problem": "B.5 'Native hash jumps land on a pinned scene's start (the pin-spacer top)' is not how ScrollTrigger pins behave: the id is on the pinned element, which is `position: fixed`/transformed during the pin, so `/#engine` lands unpredictably and `ScrollTrigger.refresh()` after a hash jump can double-offset.",
+      "fix": "Put each anchor id on a static outer `<section>` wrapper that ScrollTrigger does not pin (pin its inner `div`), and give `pinSpacing: true`; document that `SceneController.seek(id)` resolves `trigger.start` from the wrapper, and that hash navigation on load calls `seek` after `ScrollTrigger.refresh()` with `scrollRestoration = 'manual'`."
+    },
+    {
+      "severity": "major",
+      "problem": "A.8 ShakirOne desktop layout does not fit the 900px reference viewport: 56px nav + ring (radius 260 + 56px nodes = 576px) + H2 + message + supporting + a 7-step horizontal pipeline with two-line sub-labels at ~160px per step exceeds 900px, and the sub-labels wrap to three lines at 11px.",
+      "fix": "At 88\u2013100% fold the 20 nodes INTO the pipeline: nodes contract to radius 180px and the CREATE / RESEARCH / BUILD / ACT step absorbs them (this is the 'one system' beat), then the pipeline (max-width 1120px, 7 steps, labels only; sub-labels appear as a single caption row on hover/focus or in the DOM list) replaces the ring area. Mobile stays vertical at 56px rows. Set the ring radius to 220px at 1024\u20131279px."
+    },
+    {
+      "severity": "minor",
+      "problem": "A.0 'never more than two beams on screen' is contradicted by B.4 BeamRail ('the only place the beam is persistent') plus hero ambient pass plus CTA-hover trace = three, and by A.8 '\u2264 2 beams' plus the rail.",
+      "fix": "State that BeamRail's indicator is a lit tick and a 1px 40% rail, not a `ShakirBeam` instance, and is excluded from the count; the CTA-hover trace pre-empts the ambient ridge pass (the ridge pass pauses while a hover trace runs)."
+    },
+    {
+      "severity": "minor",
+      "problem": "A.4 transition out: 21 nodes 'migrate to interface anchor points (the chat panel's four corners and five message-row margins)' = 9 anchors for 21 nodes.",
+      "fix": "Define 21 anchors: 4 corners, 5 row margins \u00d7 2 sides = 10, 7 along the panel's top hairline at 90px spacing; or keep 9 anchors and state that the remaining 12 nodes dim to ambient (15% opacity) and join the field."
+    },
+    {
+      "severity": "minor",
+      "problem": "Arithmetic: mobile 'pinned 1,770svh + flowing 600svh' is wrong (pinned 160+220+200+600+260+220 = 1,660; flowing 400+200+110 = 710); tablet '2,340vh' does not follow from pin distances \u00d7 0.85 (1,740 \u00d7 0.85 = 1,479 \u2192 2,399vh). A.9\u2192A.10 '160 calm triangles subdivide into four' yields 640, not the 2,000 'thousands'.",
+      "fix": "Correct the splits (1,660 + 710 = 2,370; tablet 2,399 \u2248 2,400vh) and recompute after the mobile engine change; make the Trust\u2192CTA birth a two-pass subdivision (160 \u2192 640 \u2192 2,560, culled to 2,000 by removing the smallest 560)."
+    },
+    {
+      "severity": "minor",
+      "problem": "A.9 Trust is a 3\u00d72 grid of six titled paragraphs \u2014 the standard SaaS 'trust badges' block; it is the one place in the storyboard that could sit on any AI template.",
+      "fix": "Make the six principles six large calm facets of one shape in the canvas (a flat hexagonal plane subdivided into six triangles, each \u2264 8% luminance delta, the teal facet being the active one); the DOM text sits over each facet; on hover/focus the facet brightens 6%. One column on mobile stays, with the facet as a 48px leading glyph."
+    },
+    {
+      "severity": "minor",
+      "problem": "A.6 never says how worlds are coloured. A builder will default to one hue per world, which at six hues on the same screen is the 'rainbow overload' \u00a701 forbids.",
+      "fix": "State: all nodes are graphite at rest; each world owns one accent from \u00a703 (CREATE soft magenta, LEARN electric blue, BUILD & GROW warm amber, ACT violet, TRUST teal, HUMAN gold) used only on the lit facet of the active/hovered node and on its beam run; at most one world's accent is active at a time."
+    },
+    {
+      "severity": "minor",
+      "problem": "B.1 / B.4: PRICING is a primary nav item, but `/pricing` may ship as 'Pricing details on request', which reads unfinished from the first click.",
+      "fix": "Gate the nav item and footer link on the presence of `data/pricing.ts` (`navigation.ts` filters by a `requires` key); if absent at launch the slot is taken by DEVELOPERS."
+    },
+    {
+      "severity": "minor",
+      "problem": "B.5 '/#id loads the home with the intro skipped (session key)' fails when the session started on another page: the key is only written on `/`, so a visitor who began on `/features` and clicks SHAKIR ONE gets the full intro before the seek.",
+      "fix": "Intro mounts only when the key is unset AND `location.hash` is empty AND `document.referrer` is not same-origin; the inline script in the layout applies all three."
+    },
+    {
+      "severity": "minor",
+      "problem": "A.3 'EXPLORE FEATURES' seeks ~780vh (\u22487,000px) through three scrubbed transitions in 900 ms: the visitor sees a blur of fracture \u2192 network \u2192 interface \u2192 universe.",
+      "fix": "`SceneController.seek` enters a 'jump' mode: `LowPolyScene` crossfades directly from the current state to the target scene's end state in 400 ms while the window scrolls with `autoKill: false`, then resumes scrubbing; EXPLORE FEATURES is an `<a href=\"#universe\">` enhanced by JS so it works without JS."
+    },
+    {
+      "severity": "minor",
+      "problem": "A.2 shot 7: 'a 30\u00b0 highlight band sweeps across the logo's bounding box' \u2014 a band over a rectangle shows light on the graphite around the hand, which reads as a cheap shine, not 'light passes over logo'.",
+      "fix": "Clip the band to the logo silhouette with `mask-image: url(logo.webp)` on the overlay element (requires the transparent master; the keyed dev asset works meanwhile), and reuse the same masked band for the final CTA's pass at 92%."
+    },
+    {
+      "severity": "minor",
+      "problem": "A.2 intro overlay a11y: no role/name, focus is not placed, and 'any key' includes Tab so a keyboard user cannot reach SKIP without triggering it (acceptable) but a screen-reader user is not told what is happening.",
+      "fix": "Overlay `role=\"dialog\" aria-label=\"Shakir AI intro, press Escape to skip\"`, focus on the SKIP button at 0 ms, `aria-live=\"polite\"` announcement 'Intro skipped' on skip; reduced-motion variant announces nothing extra."
+    },
+    {
+      "severity": "minor",
+      "problem": "A.2 shot 9 vs scroll unlock: scroll unlocks at 3,200 ms while the logo FLIP runs to 3,800 and the headline enters at 3,400; a visitor scrolling at 3,250 ms has the hero scrub fading a logo that is still flying into position.",
+      "fix": "Make the handoff scroll-safe: the FLIP and headline entrance run on a time-based timeline that `SceneController` fast-forwards to its end on the first scroll event; the hero scrub reads the logo's opacity multiplier from the FLIP's end state."
+    },
+    {
+      "severity": "minor",
+      "problem": "A.3 mobile hero: nav 56 + logo 200 + headline + supporting + two stacked CTAs \u2248 520px exceeds the 55% above the ridge at 844svh.",
+      "fix": "State that text and CTAs may overlay the ridge's upper third (facets there capped at L 14%), logo 160px on viewports < 700svh, CTAs side by side at \u2265 360px width."
+    },
+    {
+      "severity": "minor",
+      "problem": "A.4 'one beam, 1,200 ms-equivalent per hop' and A.5 '500 ms-equivalent' are meaningless on a scrubbed timeline: 21 hops in 35% of a 180vh pin is 3vh (~27px) per hop.",
+      "fix": "Express scrubbed beam runs in % of pin (each hop 1.6%, the panel trace 6%) and reserve ms only for time-based runs (hover, idle, intro)."
+    },
+    {
+      "severity": "minor",
+      "problem": "\u00a711 requires a distinctive icon per feature; A.6 nodes are numbered polygons with no icon slot, so the presentation section has nowhere to put one.",
+      "fix": "Reserve a 24px icon inside each 56px polygon (SVG, single-colour, `data/features.ts` key `icon`), number 01\u201321 moves to a 10px label under the polygon."
+    },
+    {
+      "severity": "minor",
+      "problem": "A.4 mobile 'nodes in a 3\u00d77 grid' turns the network into exactly the identical-grid layout \u00a710 warns against.",
+      "fix": "Use a 3-ring spiral (1 + 6 + 14) around the centre at radii 0 / 72 / 140px; labels hidden below 360px stays."
+    },
+    {
+      "severity": "minor",
+      "problem": "A.0 Logo: the dev fallback (watermark cropped, white keyed out) will eat the base plate's light-grey highlights and anti-aliased edges, and nothing says it must not ship; B.1's `opengraph-image` 'logo on graphite' also needs the transparent master.",
+      "fix": "Label the keyed PNG `brand/dev-only/` and add a build-time check that fails `next build` for production if `public/brand/logo-*.webp` were generated from it; list the transparent master as a launch blocker for scenes 0/1/4/6/8, nav, footer and the OG image."
+    },
+    {
+      "severity": "minor",
+      "problem": "A.10 does not say when the two CTAs appear or whether they remain focusable during the collapse; A.11/A.10 stop the RAF only when the footer is in view, but Trust (20 s drift) and any tab-hidden state also need no per-frame work.",
+      "fix": "CTAs enter at 90\u2013100% (opacity + 16px rise) and stay after unpin; `LowPolyScene` pauses its RAF whenever no tween is active, on `visibilitychange`, and in Trust renders on a 1 fps timer."
+    }
+  ]
+}

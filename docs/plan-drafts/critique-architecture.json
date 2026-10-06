@@ -1,0 +1,145 @@
+{
+  "verdict": "The draft is unusually concrete for a pre-build plan: the folder map honours brief \u00a726 verbatim, the LowPolyScene prop surface matches \u00a727, GSAP is centralised per \u00a728, Canvas 2D + SVG is a defensible reading of \u00a725, and the test/CI inventory covers every \u00a732 gate. But it has several faults a builder would hit on day one. Two of them violate the brief outright: the `mono` Logo variant and the `mark` formation redraw/approximate the official logo (\u00a702), and 12 of the 21 features have no visual demonstration (\u00a711). Two make the stated performance targets unmeetable: the hero is hidden behind an inline-script gate until the intro JS runs (kills LCP and the \"works without JS\" claim), and the profile detector sends every Safari/iOS device to LOW because `navigator.deviceMemory` is undefined there. Internal wiring is inconsistent in places that matter (NavBar reads a context it is not inside; Flip across a portal cannot move the same DOM node; five chapters are never wrapped in `SceneChapter`; `collapse()` takes a ms duration inside a scrubbed pin; ShakirOne is both pinned and unpinned on mobile). The glass sticky header is both the most generic element in the plan and a real GPU cost over a repainting canvas. Accessibility is thoughtful on keyboard models but has a hole in every pinned chapter (focus can land on nodes that have not been assembled yet) and treats REDUCED_MOTION as \"replace the constellation with a list\", which removes the product story rather than its motion. All of this is fixable without changing the architecture; the issues below give the exact replacements.",
+  "issues": [
+    {
+      "severity": "blocker",
+      "problem": "\u00a702 violation: two places turn the official logo into a derived artwork. (a) `Logo variant=\"mono\"` masks the alpha channel with `currentColor`, producing a single-colour silhouette of a rainbow-faceted 3D render \u2014 that is a redesign, and at `xs` (24 px) a crown-hand-base silhouette is an unreadable blob. (b) The `mark` Formation (`lib/lowpoly/silhouette.ts`, `formations/mark.ts`) samples the logo alpha into a point cloud so triangles form the logo's shape until t = 0.85 \u2014 a low-poly approximation of the logo on screen, exactly what the task context forbids. It also contradicts the \u00a730 sequence the same section describes: `collapse` reduces the field to ONE triangle, then `mark` re-expands it into a silhouette.",
+      "fix": "Delete `LogoVariant 'mono'`, `silhouette.ts`, `formations/mark.ts` and the `mark` chapter. Footer legal line and print use `variant=\"mark\" size={32}` (the real asset). FinalCTA ends with `collapse(target)` bringing the field to a single crown-gold triangle whose centroid is `logoRect` centre; at collapse progress 0.85\u21921.0 that triangle fades to 0 while `Logo xl` (official asset) fades 0\u21921 at the same rect. Replace the Formation union with: 'void'|'points'|'fragments'|'terrain'|'network'|'interface'|'universe'|'engine'|'one'|'calm'|'collapse' (11). Add one line to D.2: \"No component may derive a shape, outline, mask or point cloud from the logo; the only permitted treatments are opacity, scale (uniform), blur \u2264 8 px, and a light sweep through its own alpha.\""
+    },
+    {
+      "severity": "blocker",
+      "problem": "\u00a711 violation: \"Each feature should have \u2026 visual demonstration, relevant animation\". `Feature.demoComponent: DemoId | null` and the D.12 table give 12 of 21 features (study, research, video-search, writing, truth-verify, goal-to-action, agent, medical, offline, privacy, human-talent, marketing) no demonstration at all, so their FeatureDetail is text + chips.",
+      "fix": "Add a tenth DemoId `'capability'` \u2192 `demonstrations/CapabilityDemo.tsx` (shared, \u2264 8 KB gz): a 3\u20134 step beam-connected rail (`ShakirBeam preset=\"connect\"`, 350 ms per step) rendered from `data/demos/capability/<featureId>.ts` (`DemoStep[]`, 3\u20134 steps each, e.g. research: QUESTION \u2192 SOURCES \u2192 CROSS-CHECK \u2192 ANSWER WITH CITATIONS; truth-verify: CLAIM \u2192 EVIDENCE \u2192 CONFIDENCE \u2192 VERDICT; offline: NO NETWORK \u2192 LOCAL MODEL \u2192 RESULT). Make `demoComponent: DemoId` non-nullable; add the 12 data files to L.5 [M7] and a unit test `every feature has demoComponent \u2208 registry`."
+    },
+    {
+      "severity": "blocker",
+      "problem": "Infeasible performance targets and a no-JS failure caused by the intro gate. `IntroGateScript` sets `data-intro=\"pending\"` before paint and `motion.css` hides the hero under it; the hero only reappears after hydration, the GSAP chunk and the `IntroSequence` phases (logo emerges at 1 800 ms, handoff at 3 200 ms). On the Lighthouse mobile preset (slow 4G, 4\u00d7 CPU) that makes LCP \u2248 hydration + 1.8 s \u226b the stated 2.0 s budget, and if the bundle fails or stalls the visitor sees a black page forever \u2014 contradicting D.0's \"the story survives without JS\" and \u00a722 \"fast first render\". The intro also calls `scene.morphTo('terrain')` at 400 ms, but LowPolyScene (delaunator + formations) is a separate chunk that cannot be guaranteed loaded by then.",
+      "fix": "(1) Never hide the hero. Server-render the intro overlay in `layout`/`page` HTML (not a client portal) as a `position:fixed` graphite layer above the hero with the hero `Logo` `<img priority fetchpriority=\"high\">` inside the HTML at opacity 1 by 0 ms on the overlay (that image becomes LCP, ~0.6 s). (2) `IntroGateScript` only removes the overlay when `sessionStorage['shakir.intro.v1']` is set; and it schedules `setTimeout(() => html.dataset.intro='seen', 2500)` which the hydrated IntroSequence cancels \u2014 the hero can never stay hidden. (3) Phases 0\u20131 400 ms use CSS/SVG only (48 dots + 24 SVG `FacetPanel` fragments assembling via GSAP); LowPolyScene joins the timeline when its `onReady` fires, otherwise the intro completes on the SVG path. (4) Restate the Lighthouse budget as measured on the LOW profile with intro skipped (`?intro=0`) and add a second run with the intro for LCP only."
+    },
+    {
+      "severity": "blocker",
+      "problem": "Profile detection sends every Apple device to LOW, violating \u00a724 \"Desktop: full cinematic experience\". `hardwareConcurrency \u2265 8 && deviceMemory \u2265 8 \u2026` \u2192 HIGH, `cores \u2265 4 && memory \u2265 4` \u2192 MEDIUM, `else LOW`: Safari (macOS and iOS) never exposes `navigator.deviceMemory`, so an M3 MacBook Pro and an iPhone 15 Pro both get 320 triangles and no particles, while a cheap 8-core/4 GB Android gets MEDIUM.",
+      "fix": "In `lib/performance/profile.ts`: treat a missing signal as unknown, not failing. Rule: `saveData || cores < 4` \u2192 LOW; else start at MEDIUM; promote to HIGH when `width \u2265 1024 && (deviceMemory === undefined || deviceMemory \u2265 8) && cores \u2265 8` OR when the 500 ms rAF probe shows \u2264 1 dropped frame of 30 at MEDIUM load; the probe then demotes one step on > 4 drops. Add the Safari case (cores 8, memory undefined \u2192 HIGH on desktop width, MEDIUM on phone width) to the `profile` unit-test matrix."
+    },
+    {
+      "severity": "major",
+      "problem": "NavBar cannot read `SceneController.activeChapter`. `SceneController` (with `SceneContextValue`) is mounted inside `app/page.tsx`, but `NavBar` lives in `layout.tsx` above `{children}`; React context does not flow upward. D.1 shows a `SceneProvider(no-op outside home)` in AppProviders but gives it no interface, and `SceneController` is drawn as the context owner.",
+      "fix": "Split the responsibility: `components/providers/SceneProvider.tsx` (in AppProviders) owns a tiny store `{ activeChapter: SceneId | null; setActiveChapter }` (useSyncExternalStore, no rerender of the scene); `SceneController` keeps the registry and the fixed canvas and calls `setActiveChapter` from its ScrollTrigger `onToggle`. `NavBar` reads `useActiveChapter()` from SceneProvider; outside home it returns null and links fall back to pathname matching. Update `SceneContextValue` to drop `activeChapter`."
+    },
+    {
+      "severity": "major",
+      "problem": "The intro\u2192hero handoff as specified is not implementable: \"GSAP Flip moves the *same* `Logo#brand-hero` node\" from a client portal overlay to the server-rendered hero. React owns both trees; a DOM node cannot be shared between a portal and the hero without React unmounting and recreating it, and Flip animates one element's state change, not a move between trees.",
+      "fix": "Keep the Logo in the hero DOM only. During `data-intro=\"pending\"` give `#brand-hero` `position: fixed; z-index: var(--z-intro)+1` and centre it with a transform; the overlay sits beneath it. Handoff = `Flip.getState('#brand-hero')` \u2192 remove the fixed class \u2192 `Flip.from(state, { duration: 0.6, ease: 'shakir.inOut', scale: true })`. The wordmark chars are rendered inside the overlay and simply fade; no node moves."
+    },
+    {
+      "severity": "major",
+      "problem": "The chapter chain is hard-coded in an order that contradicts the brief's narrative and may collide with section C. \u00a706: mountain \u2192 fragments \u2192 network \u2192 interface \u2192 universe \u2192 creation engine \u2192 Shakir One; \u00a709 is the \"all nodes connect into one system\" climax. D.5 fixes `hero(terrain) \u2192 one(network\u2192one) \u2192 interface \u2192 universe \u2192 engine`, putting ShakirOne (27 nodes incl. 21 capability dots) before the visitor has met any feature, and binds the `network` formation to the ShakirOne chapter so the chain only works for this order. D.1 then says order is owned by section C \u2014 if C follows \u00a706, the formation pairs break.",
+      "fix": "Adopt the \u00a706 order and give each chapter its own formation independent of neighbours in `animations/scroll/scenes.ts`: hero=terrain, interface=network\u2192interface (ChatDemo chapter), universe=universe, engine=engine, one=one, calm=calm, collapse=collapse. The transition rule already interpolates adjacent formations, so any reordering by C remains a table change. Also drop `intro` from the chapter registry: it is time-based, not scroll-based (its formation is driven by `introTimeline`)."
+    },
+    {
+      "severity": "major",
+      "problem": "Five of the eight chapters are never registered. The tree wraps only Hero and TrustSection in `SceneChapter`; `ChatDemo` (interface), `FeatureUniverse` (universe), `DemoShowcase` (engine \u2014 a *server* component, so it cannot call `useSceneChapter`), `ShakirOne` (one) and `FinalCTA` (collapse) have no registration path, and `SceneId`, `Point`, `PaletteDef`, `IconId`, `World`, `PipelineStep`, `UniverseLayout`, `DemoMode` are used but never defined or located.",
+      "fix": "Rule in D.0: every home chapter is a `<SceneChapter \u2026>` wrapper in `page.tsx` around the section component; add the table to D.5: `{ id:'hero', formation:'terrain', palette:'spectrum', intensity:0.55 } \u00b7 { id:'interface', formation:'interface', palette:'act', intensity:0.5 } \u00b7 { id:'universe', formation:'universe', palette:'spectrum', intensity:0.6, pin:{ lengthVh:300, mobileLengthVh:0 } } \u00b7 { id:'engine', formation:'engine', palette:'create', intensity:0.5, pin:{ lengthVh:250, mobileLengthVh:0 } } \u00b7 { id:'one', formation:'one', palette:'crown', intensity:0.7, pin:{ lengthVh:400, mobileLengthVh:0 } } \u00b7 { id:'calm', formation:'calm', palette:'graphite', intensity:0.15 } \u00b7 { id:'collapse', formation:'collapse', palette:'crown', intensity:0.6, pin:{ lengthVh:300, mobileLengthVh:180 } }`. Define `type SceneId = typeof homeChapters[number]['id']` in `animations/types.ts`; put `Point`, `PaletteDef`, `Formation` in `lib/lowpoly/types.ts`; `IconId`, `World`, `PipelineStep`, `UniverseLayout` in `data/types.ts`; `DemoMode = 'scrub'|'manual'|'static'` in `demonstrations/registry.ts`."
+    },
+    {
+      "severity": "major",
+      "problem": "FinalCTA is internally contradictory: it is \"pinned 300 vh\" (scrub-driven) yet calls `scene.collapse(logoRect, 2400)` with a millisecond duration and `collapse()` returns a time-based `gsap.core.Timeline`. A builder cannot tell whether scroll or time drives the \u00a730 sequence, and `mobileLengthVh` is unspecified for it.",
+      "fix": "Make collapse scrub-only: `collapse(target: DOMRect): gsap.core.Timeline` returns a paused timeline with labels `thousands`(0) \u00b7 `hundreds`(0.35) \u00b7 `dozens`(0.65) \u00b7 `one`(0.85) \u00b7 `logo`(1.0); `finalCtaTimeline.ts` adds it to the pinned scrub (300 vh desktop, 180 vh mobile, unpinned under REDUCED_MOTION where the official Logo is simply shown with a 500 ms fade). Headline and CTAs enter at label `one`."
+    },
+    {
+      "severity": "major",
+      "problem": "The glass header is the most generic element in the plan and a real performance cost: `backdrop-filter: blur(12px)` over a canvas that repaints every frame forces the GPU to re-blur the header strip on every frame (the canvas is `position:fixed` beneath it), which is a known mobile jank source; plus 72\u219256 compaction, hide-on-scroll-down and link-underline are the stock AI-startup header. A hidden header also leaves keyboard users tabbing into invisible nav links.",
+      "fix": "No `backdrop-filter`. NavBar background = `linear-gradient(#0A0A0C 0%, rgba(10,10,12,0.85) 70%, transparent)` with a 1 px bottom edge drawn as a 3-segment faceted SVG line in graphite 24 % (the only decorative element). Keep compaction (72\u219256), drop hide-on-scroll; if kept, force `visible` while `:focus-within`. Active link marker = a 2 px warm-amber facet (triangle) under the label instead of an underline."
+    },
+    {
+      "severity": "major",
+      "problem": "Keyboard users can focus elements that do not exist yet. In pinned, scrubbed chapters (`FeatureUniverse`, `ShakirOne`, scrub-mode demos) nodes are `<button>`s rendered at opacity 0 until the scrub reaches their phase; Tab lands on an invisible, unlabeled-by-position control, and Enter opens a modal from a scene the user never saw. This breaks \u00a723 \"every important interaction must work without a mouse\".",
+      "fix": "Add to `SceneChapter`/`pinSection.ts`: on `focusin` inside a pinned chapter, call `ScrollTrigger.scroll(trigger.end)` (desktop) so the chapter jumps to its assembled end-state, or set `data-assembled` on the section so CSS shows the fully assembled layout; until assembled, give unassembled nodes `tabindex=-1` and `aria-hidden=\"true\"` via the timeline's `onUpdate` crossing the phase label. Add `a11y/focus.spec`: Tab from the hero reaches every FeatureNode and OneNode with the node visibly rendered."
+    },
+    {
+      "severity": "major",
+      "problem": "REDUCED_MOTION is treated as 'remove the content', and three chapters have no reduced-motion end state at all. `FeatureUniverse` is replaced by `FeatureList` (a plain `<ul>`) \u2014 reduced-motion users lose the constellation, the hover/focus illumination and the \u00a710 'feature worlds' idea, although none of those are motion. `ShakirOne`, `FinalCTA` and the hero headline/Flip handoff specify only mobile or nothing.",
+      "fix": "REDUCED_MOTION = final assembled frame, no pins, opacity-only transitions \u2264 320 ms: FeatureUniverse renders the assembled constellation statically (no scrub, no scale on hover \u2014 lit state via colour + 1 px stroke), `FeatureList` stays for `<noscript>` and the `/features` page only; ShakirOne renders the fully connected ring with the pipeline list; FinalCTA shows the official Logo with a 500 ms fade; hero headline is plain text (already stated). Record these in `reducedTimelines.ts` with the same labels so tests can assert parity."
+    },
+    {
+      "severity": "major",
+      "problem": "Engine performance details that decide 60 fps on a mid-range phone and a 1920\u00d71080 desktop are missing. (1) Canvas backing size is capped only by DPR (\u2264 1.5 on HIGH): at 2560\u00d71440 that is 3840\u00d72160 \u2248 8.3 MP of flat-shaded, translucent, 3-layer overdraw per frame \u2014 Canvas 2D fill rate will not hold 60 fps. (2) Per-triangle `fillStyle` strings computed from `normal\u00b7light` every frame allocate ~1 400 strings/frame \u2192 GC hitches. (3) 'glow' is part of `intensity` but the rendering technique is unstated; `shadowBlur`/`filter` on Canvas 2D would be catastrophic. (4) The idle loop runs at full rAF even when nothing morphs.",
+      "fix": "Add to `budgets.ts`: backing-pixel cap 3.0 MP (HIGH), 1.6 MP (MEDIUM), 0.8 MP (LOW) \u2014 DPR is derived as `min(profileDpr, sqrt(cap / (w\u00b7h)))`. Colours: per palette a 64-entry `fillStyle` LUT per hue (`palette.ts`), shading quantised to the LUT; strings never built in the frame loop. Glow: forbidden on the canvas (`shadowBlur = 0`, no `filter`); the beam light is a pre-rendered 128 px radial-gradient sprite drawn with `globalCompositeOperation: 'lighter'`, \u2264 2 sprites per frame. Idle: when no morph/pulse is active and the pointer is still for 2 s, `frame-loop.ts` drops to 30 fps on MEDIUM/LOW and 60 fps only during scrub or pointer movement. Add these as rows in `scripts/measure-scene.ts` output (fps per chapter at 390\u00d7844 MEDIUM and 1920\u00d71080 HIGH)."
+    },
+    {
+      "severity": "major",
+      "problem": "The home bundle budget (\u2264 250 KB gz, TBT \u2264 200 ms) is asserted but not planned. Every chapter component (`SceneController`, `ShakirOne`, `FeatureUniverse`, `ChatDemo`, `FinalCTA`, `MobileMenu`) is a client component in the root route with no chunk boundary, and all seven GSAP plugins register in `MotionProvider` at M1 (\u2248 70 KB gz on top of \u2248 90 KB React/Next and \u2248 10 KB Radix) before any below-fold code.",
+      "fix": "Add an itemised budget table to L.1/`lighthouserc.cjs`: framework 90 \u00b7 gsap core+ScrollTrigger+CustomEase 42 \u00b7 lowpoly engine 18 \u00b7 hero/nav/intro 20 \u00b7 fonts 0 (self-hosted, not JS) = 170 KB initial; everything below the hero (`ShakirOne`, `FeatureUniverse`, `DemoShowcase`, `FinalCTA`, `MobileMenu` body) is `next/dynamic` with `ssr: true` and loads on `useInView(rootMargin: '100%')`; SplitText, Flip, MotionPath and DrawSVG are registered lazily inside the timeline factories that need them (`lib/gsap.ts` exports `loadPlugin('SplitText')`). Enforce with `analyze` + a `size-limit` entry in CI."
+    },
+    {
+      "severity": "major",
+      "problem": "The \u00a709 headline \"ONE SHAKIR.\" does not appear anywhere in D.6, D.1 or `data/site.ts`'s list (which names only the 'Shakir One message'). A builder would ship the section without its required headline.",
+      "fix": "Add `ShakirOne` \u2192 `Heading` \"ONE SHAKIR.\" (server-rendered, enters at scrub 0.0\u20130.08 with the masked line reveal) and list `oneHeadline: 'ONE SHAKIR.'` in `data/site.ts`; add it to the \u00a729 copy unit test fixture."
+    },
+    {
+      "severity": "major",
+      "problem": "Demo imagery risks misrepresentation (\u00a713 'believable rather than fake magic', \u00a729). `ImageDemo` says gallery images are 'client-supplied or licensed' and `VideoDemo` loads a 720p clip from the asset request \u2014 stock photography/footage shown inside a 'PROMPT \u2192 PARTICLES \u2192 IMAGE FORMATION' sequence reads as Shakir's generated output.",
+      "fix": "In `docs/asset-requests.md` ask for genuine Image AI outputs (4 variations from one prompt, with the prompt) and a genuine Video AI clip; if the client supplies licensed media instead, `DemoCaption` renders the fixed label 'Illustrative preview \u2014 not generated output' on those steps and the prompt text is replaced with 'Example prompt'. Same rule for `WebsiteBuilderDemo`'s MiniSite images."
+    },
+    {
+      "severity": "major",
+      "problem": "The logo asset request does not cover the two things that will actually break the hero: the source is a 3D render on white with anti-aliased edges, soft contact shadow and base reflection; a straight alpha cut-out shown on #0A0A0C will have a white fringe around every facet and a floating white smear under the base. `LogoLightSweep` and the (now-removed) mono variant also depend on that alpha, so M2's gate is blocked on an under-specified request.",
+      "fix": "Extend `docs/asset-requests.md`: 1024\u00b2 (and 2048\u00b2) PNG with straight (non-premultiplied) alpha rendered against black/graphite, shadow and reflection either removed or baked for a dark background, no watermark; plus an SVG if the source is vector. Add to M2 visual review: logo edge inspection at 4\u00d7 zoom on graphite. State the interim: M2 builds against a same-aspect placeholder box (`public/brand/placeholder-mark.png`, solid #1E1E24) and `check:logo` is skipped until `brand/manifest.json` exists; both are removed the day the asset lands."
+    },
+    {
+      "severity": "major",
+      "problem": "Milestone 9 (Responsive/mobile optimisation, \u00a733) has zero files in L. Mobile recompositions are tagged M5/M6 (`feature-universe-layout.ts`, ShakirOne vertical rail) and `mobile.spec` M10, so there is nothing to run, build, review and report evidence for at M9.",
+      "fix": "Tag to M9: `data/feature-universe-layout.ts` mobile/tablet clusters, `animations/scroll/pinSection.ts` mobile branches, `components/features/one/ShakirOne.tsx` vertical rail, `DemoFrame` manual mode, the tablet (768) and large (1920) Playwright projects, `e2e/mobile.spec`, the mobile rows of `scripts/measure-scene.ts`, and a `docs/evidence/m9-viewports.md` with the 5-viewport screenshots. Desktop-only versions ship in M5\u2013M8."
+    },
+    {
+      "severity": "minor",
+      "problem": "ShakirOne mobile behaviour contradicts itself: 'pinned 400 vh desktop / 250 vh mobile' and two sentences later 'Mobile: unpinned'. `SceneChapterDef.pin.mobileLengthVh` has no stated breakpoint semantics.",
+      "fix": "Define: `pin.lengthVh` applies \u2265 1024, `pin.mobileLengthVh` applies 768\u20131023 (tablet), and < 768 is never pinned (`mobileLengthVh` ignored). ShakirOne: 400 vh / 250 vh / unpinned."
+    },
+    {
+      "severity": "minor",
+      "problem": "Default beam colour `'spectrum'` (blue \u2192 violet \u2192 amber) on every UI surface \u2014 button hover, dialog trace, trust pillars \u2014 drifts toward rainbow overload (\u00a701) and dilutes the motif.",
+      "fix": "`ShakirBeam` default `color` = `'surface'` (soft white \u2192 warm amber, 2 stops) for `path: 'surface'` and `preset: 'trace'`; `'spectrum'` is only allowed for `preset: 'flow'` inside geometry and `connect` in ShakirOne; `Button beam` and `FeatureDetailModal` use the active world's palette id."
+    },
+    {
+      "severity": "minor",
+      "problem": "Logo minimum size 24 px (`xs`, used in FeatureDetail header and the footer legal line) is too small for a detailed crown-hand render; the mark will read as a smudge.",
+      "fix": "Minimum 32 px (`xs` = 32, `sm` = 40, `md` = 56, `lg` = 140, `xl` = 220). FeatureDetail header shows the world eyebrow + name, no mark; legal line uses `sm`."
+    },
+    {
+      "severity": "minor",
+      "problem": "Small internal inconsistencies a builder will trip on: D.0 says `SkillDemo` mounts an inline `LowPolyScene`, D.8 does not; `DemoShowcase` says 'the other six open from FeatureDetail' but Chat is also inline on home (9 \u2212 3 \u2212 1 = 5); the intro uses CSS dots so the `points` formation has no consumer; the `intro` chapter is `void\u2192fragments` but the intro timeline morphs to `terrain`; `relatedTo()` unions both directions (up to 13 for `business`) while `FeatureConnections` lights 'max 5'.",
+      "fix": "Remove the SkillDemo inline scene (its 7 panels are `FacetPanel`s); write 'the other five'; delete the `points` formation or use it in the intro at 0\u2013400 ms instead of CSS dots (choose: delete); intro morphs `void \u2192 fragments \u2192 terrain` inside `introTimeline`, not as a chapter; lit edges = the node's own `connections[]` (\u2264 5), detail chips = `relatedTo()` union."
+    },
+    {
+      "severity": "minor",
+      "problem": "Scroll-lock and modal interplay with pinned ScrollTrigger sections is unspecified: `useLockBodyScroll` (overflow hidden) changes the scrollbar width and triggers a `ScrollTrigger.refresh()`, producing a layout jump (CLS) under the open `FeatureDetailModal` and a shifted pin on close.",
+      "fix": "`globals.css`: `html { scrollbar-gutter: stable }`; `useLockBodyScroll` uses Radix's `RemoveScroll` (already in Dialog) and `ScrollTrigger` is not refreshed while `document.documentElement.dataset.modal === 'open'`; add to `features.spec`: open/close modal from a pinned chapter, CLS \u2264 0.05."
+    },
+    {
+      "severity": "minor",
+      "problem": "`MotionToggle` is rendered only in the Footer and built at M8, so the motion kill-switch is unreachable without scrolling the entire motion-heavy page, and reduced-motion QA (\u00a733 per-milestone review) has no UI from M2\u2013M7.",
+      "fix": "Build `MotionToggle` at M2; render it in `MobileMenu` and in the `NavBar` overflow (an `Eye`-icon menu button) as well as the Footer."
+    },
+    {
+      "severity": "minor",
+      "problem": "Tooling gaps in L: the `no-restricted-imports` fence names `gsap` but not `@gsap/react` or `gsap/*` subpaths; `IntroGateScript` is an inline `<script>` under a CSP header with no nonce/hash strategy; no major versions are pinned (Next, React, Tailwind, GSAP, Radix); `prettier-plugin-tailwindcss` with Tailwind v4 needs `tailwindStylesheet`.",
+      "fix": "Fence pattern `['gsap', 'gsap/*', '@gsap/react']`; CSP `script-src 'self' 'sha256-<hash of IntroGateScript>'` computed at build in `next.config.ts`; pin Next 15.x, React 19.x, Tailwind 4.x, GSAP 3.13.x, @gsap/react 2.x, Radix Dialog 1.x in L.1; `.prettierrc` \u2192 `\"tailwindStylesheet\": \"./src/styles/globals.css\"`."
+    },
+    {
+      "severity": "minor",
+      "problem": "`LiveIndicator` pulses indefinitely (1.2 s) and `HeroScrollCue` is the stock 'line + SCROLL'; neither states a reduced-motion behaviour, and the cue is the one hero element with no Shakir identity.",
+      "fix": "LiveIndicator: static amber dot + 'LIVE' under REDUCED_MOTION, pulse only while the demo's LIVE step is active. HeroScrollCue: a 32 px vertical `ShakirBeam preset=\"trace\" color=\"surface\"` that plays once on hero entrance and once more at 6 s if no scroll, static 1 px line under REDUCED_MOTION."
+    },
+    {
+      "severity": "minor",
+      "problem": "`app/loading.tsx` is described as the \u00a702 'loading experience', but a root `loading.tsx` only renders during client navigations (Suspense), never on first load, and will flash on fast route changes.",
+      "fix": "State that first-load 'loading' is the intro itself; `LoadingMark` is shown only for navigations longer than 150 ms (`opacity` delay via CSS `animation-delay`) and sits at `app/features/loading.tsx` and `app/(site)/loading.tsx` rather than the root."
+    },
+    {
+      "severity": "minor",
+      "problem": "`HeroHeadline` uses SplitText lines without stating how screen readers receive the headline; split `<div>` lines read as separate fragments.",
+      "fix": "Use SplitText 3.13 with `aria: 'auto'` (sets `aria-label` on the parent and `aria-hidden` on the lines) and `autoSplit: true`; `textReveal.ts` reverts on unmount."
+    }
+  ]
+}

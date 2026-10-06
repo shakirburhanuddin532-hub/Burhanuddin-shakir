@@ -1,0 +1,150 @@
+{
+  "verdict": "Section F is the strongest kind of draft to review: it makes real decisions (plugin set, registry, factories, named eases, scene table, beam spec, reduced-motion matrix) and most of it is traceable to the brief. But it has four logic breaks that would make the build fail on first contact with a real user: the no-JS safety animation fires at 2.5 s after first paint and overrides the GSAP intro on every cold load; the intro runs with scroll unlocked while the hero's pinned ScrollTrigger is live and both drive the same LowPolyScene params; the route-change kill-switch fires when the feature-detail intercepting route opens and destroys the home page's triggers; and the universe keyboard model (scrollIntoView inside a pinned scene, opacity-0 nodes still tabbable) cannot work, which violates \u00a723. Beneath those are material gaps: the hero is hidden at opacity 0 for 3-5 s so \u00a722 Core Web Vitals cannot be met as written, the logo PNG is white-backed and only shot 7 is gated on alpha, the scene-to-scene crossfade ignores the 100 vh pinSpacing interlude, SceneController's single `stage` prop cannot express scene 2, and no rule exists for profile demotion mid-scroll. Numbers disagree with each other in several places (layer caps 8/6/4 vs 3 vs 12, blend window 8% vs 12%, hero mobile 120 vh vs x0.7, beam dwell cap vs 3 s trust underline). Fix the blockers and majors and this section is buildable; the architecture itself (registry + factories, one persistent canvas, scrub-vs-time rule, speed-derived beam, no image sequences) is sound and should be kept.",
+  "issues": [
+    {
+      "severity": "blocker",
+      "problem": "F.3.4 no-JS safety: `html[data-intro=\"pending\"] .hero-ui { animation: introSafety 0.4s 2.5s forwards }` starts counting at first paint and a CSS animation with `forwards` wins over GSAP's inline styles. The intro timeline starts only after hydration (+ up to 800 ms decode wait) and reaches the hero UI at ~3.2 s after that, so on EVERY cold load the hero UI pops in at 2.5 s wall-clock, in the middle of shots 4\u20137, and the GSAP shot-9 entrance then fights a forced opacity 1. The intro as designed (\u00a704) never plays.",
+      "fix": "Add a third state. `IntroSequence` sets `document.documentElement.dataset.intro = 'running'` synchronously when `intro.main` starts; CSS: `html[data-intro=\"running\"] .hero-ui { animation: none }`. Keep the 2.5 s safety only for `pending` (hydration never arrived) and make its target the overlay from the LCP fix (fade overlay out), not `.hero-ui` opacity. Add a Playwright case: block the GSAP chunk, assert hero visible at \u2264 3 s; allow it, assert `.hero-ui` computed opacity is 0 at t = 2.6 s."
+    },
+    {
+      "severity": "blocker",
+      "problem": "F.3 never locks scroll during the intro and F.1.5/F.4.5 create the hero's pinned ScrollTrigger at mount. A wheel tick during the intro both triggers the Observer skip AND scrolls the page, so `scene.hero` starts scrubbing `cameraZ` (1.0 \u2192 1.12) and `fracture` while `intro.main` is still tweening `cameraZ` (1.08 \u2192 1.0) and `assembly` on the same `LowPolyScene`; both also touch the hero UI. There is also no rule for a reload mid-page (browser scroll restoration) or a hash deep link (`/#shakir-one`): the intro would play over a pinned scene far below the hero.",
+      "fix": "(1) `html[data-intro=\"pending\"], html[data-intro=\"running\"] { overflow: hidden }`; Observer still catches wheel/touch intent for skip; unlock at the `handoff` label. (2) SceneController accepts `enabled`; the hero controller is created with `enabled: false` and enabled (`trigger.enable()` + `ScrollTrigger.refresh()`) at `handoff`; the intro is the only writer to `LowPolyScene` until then. (3) Intro runs only when `window.scrollY === 0 && !location.hash && !(performance.getEntriesByType('navigation')[0]?.type === 'back_forward')`; otherwise mark `done` and warm-start. Put `history.scrollRestoration = 'manual'` in the same inline script that sets `data-intro`."
+    },
+    {
+      "severity": "blocker",
+      "problem": "F.1.7 says `MotionProvider` watches `usePathname()` and on change runs `registry.killAll()` + `ScrollTrigger.killAll()`. F.7.2 makes the feature detail an intercepting route at `/features/[slug]`, which changes the pathname while the home page stays mounted. Opening any feature therefore kills every home-page timeline and pin (pins unpin \u2192 2000 vh layout jump behind the modal), and F.1.7's own claim that the modal 'does not change the home page's triggers; it pauses them' is contradicted by the same section.",
+      "fix": "Route-change cleanup keys on the story layout's lifecycle, not the pathname: put the kill/refresh logic in the story layout's `useGsap` cleanup (unmount = real navigation) and in `MotionProvider` only handle `ScrollTrigger.clearScrollMemory('manual')`. For the modal, `transitions/featureDetail.ts` exports `pauseHome()` (`ScrollTrigger.getAll().forEach(t => t.disable(false))`, `registry.pauseLoops()`) and `resumeHome()` (`enable()`, `ScrollTrigger.refresh()` after modal close). Add a component test: open modal \u2192 `ScrollTrigger.getAll().length` unchanged and all `.pin-spacer` heights unchanged."
+    },
+    {
+      "severity": "blocker",
+      "problem": "F.7.3 keyboard model cannot work (\u00a723 'every important interaction must work without a mouse'). (a) `scrollIntoView({ block: 'center' })` on a node inside a pinned (`position: fixed`) scene does not move scroll progress, so a world that is revealed only at a label never comes into view; `scrollIntoView` also has no GSAP ease. (b) Nodes of inactive worlds are hidden with `opacity` (F.6.6 allows only opacity/transform), so Tab/Arrow lands on invisible, non-operable buttons; the same applies to hero CTAs at opacity 0 during the intro and after the 0.35\u20130.60 exit, and to the nav before handoff.",
+      "fix": "(a) `SceneController.scrollToLabel(label, { duration: 0.6, ease: 'shakir.out' })`: tween a plain object and call `window.scrollTo(0, y)` where `y = trigger.start + (trigger.end - trigger.start) * labelProgress` (no ScrollToPlugin; plugin set stays fixed); disable snap for the duration (`trigger.vars.snap` toggled via `trigger.disable(); trigger.vars.snap=\u2026; trigger.enable()` or simply tween past `snap.delay`). On `focusin` of a node whose world label \u2260 current world, call it before playing `feature.hover`. ArrowLeft/ArrowRight move between worlds; ArrowUp/ArrowDown within a world. (b) Add a global rule to F.6.6: anything containing a focusable element animates `autoAlpha`, never `opacity`, and the SceneController sets `inert` on `.world` groups whose progress window is not active and on `.hero-ui`/`nav` until `handoff`. Playwright: Tab through the page at progress 0 and assert every focused element has `visibility: visible` and a non-zero bounding box."
+    },
+    {
+      "severity": "major",
+      "problem": "\u00a722 'excellent Core Web Vitals' is contradicted by F.3.1/F.3.4: `html[data-intro=\"pending\"] .hero-ui { opacity: 0 }` plus a 3.2 s timeline means the LCP candidate (headline/wordmark) is not painted until hydration + \u22640.8 s + ~2.8 s, i.e. 4\u20136 s on a mid-range phone, on every lab run and every first session. Separately, the start rule 'only if `performance.now() < 1500`' is measured from navigation start; a Next.js app rarely hydrates under 1.5 s on a mid-range phone, so the \u00a704 intro would effectively never play on mobile, while the '2\u20134 s target' is counted from timeline start, not from first paint.",
+      "fix": "Cover instead of hide: the hero UI is server-rendered at opacity 1 and painted at first paint (LCP = FCP); an opaque `.intro-veil` (`#0A0B0E`, `position: fixed; inset: 0; z-index: 3`) sits above it; the canvas is `z-index: 4` with `pointer-events: none` during the intro (transparent, draws points/fragments over the veil) and is set to `z-index: 0` at `handoff` with one `gsap.set`; the Skip button is `z-index: 5`. At `handoff` the veil fades over 400 ms while the hero UI plays its entrance (set to autoAlpha 0 by GSAP only after first paint). Budget from first paint: `elapsed = performance.now()` at timeline start; if `elapsed \u2264 1500` play at `timeScale(1)`; if `1500 < elapsed \u2264 3000` play at `timeScale(min(1.5, 3200 / (4000 \u2212 elapsed)))`; if `> 3000` warm-start. Restate the target as 'hero interactive \u2264 4.0 s after first paint on all profiles'."
+    },
+    {
+      "severity": "major",
+      "problem": "The official asset is a 1024\u00d71024 PNG with an opaque white background and a watermark. Shot 6 (logo opacity 0 \u2192 1 on `#0A0B0E`), the hero logo and the nav Flip are all planned as if the logo had alpha; only shot 7 is gated by `LOGO_HAS_ALPHA`. As written, a white 36 vh square fades in over graphite. Also 36 vh on a 2160 px-tall display at DPR 2 is ~1550 px, above the 1024 px source.",
+      "fix": "Add F.3.7 'Logo asset states': `LOGO_HAS_ALPHA=false` path = the `Logo` component shows the PNG unmodified inside a `#F4F6FA` plate (the PNG's own white becomes the plate; 8% padding; no cropping, no chroma-key, no auto-cutout, because those approximate the mark); the plate fades with the logo using the same opacity/uniform-scale/Flip rules; shot 7 and the F.5 masked beam-over-logo are skipped. State explicitly that the transparent SVG (or \u2265 2048 px PNG with alpha, watermark removed by the client) is a hard dependency for Milestone 2 and must be requested now. Section-E/H owners decide the plate's facet treatment; F only commits to opacity + uniform scale."
+    },
+    {
+      "severity": "major",
+      "problem": "F.6.3 describes a simultaneous crossfade (outgoing layers fade over its last 12%, incoming layers 'pre-rendered at their first frame' fade in over its first 12%). With `pin: true, pinSpacing: true` the incoming section is physically below the outgoing pin spacer; when the outgoing pin releases there are 100 vh of ordinary scrolling (outgoing section scrolling up, incoming scrolling in) before the incoming pins at `'top top'`. The two layer sets never overlap, and the 8 % stage blend in F.1.5 leaves that 100 vh un-choreographed. F.1.5 says 8 %, F.6.3 says 12 %.",
+      "fix": "Make the interlude the TRANSITION beat of \u00a706 instead of pretending it does not exist. Numbers: each boundary = outgoing last 10 % (DOM layers `autoAlpha 1 \u2192 0`, `scale 1 \u2192 1.04`) + 100 vh interlude (canvas only; stage blend runs across the whole interlude, driven by a non-pinned `ScrollTrigger` on the incoming section with `start: 'top bottom', end: 'top top', scrub: 0.6`; the F.5.4 transition beams scrub over this trigger) + incoming first 10 % (layers `autoAlpha 0 \u2192 1`, `scale 0.96 \u2192 1`). Replace every '8 %' / '12 %' with 10 %. Update F.6.1 totals: 2090 vh pinned + 7 \u00d7 100 vh interludes = 2790 vh story travel desktop. Incoming layers are set to `autoAlpha 0` at build so nothing is visible while they scroll in."
+    },
+    {
+      "severity": "major",
+      "problem": "Interface mismatch with LowPolyScene/section E. `SceneController` takes a single `stage` prop but scene 2 is 'fracture\u2192network' (two stages); `LowPolyScene`'s stage list in F.4.6 includes `network` yet no controller drives it. The set of parameters the timelines write (`points`, `assembly`, `cameraZ`, `fracture`, `lightAngle`, light tilt, per-layer offsets, breathing, dim) is scattered across F.3\u2013F.4 and never declared, so section E cannot implement the imperative handle against it.",
+      "fix": "Change the prop to `stages={[{ name: 'fracture', from: 0 }, { name: 'network', from: 0.55 }]}` (single-stage scenes pass one entry); SceneController calls `scene.setStage(name, localProgress)` for the active entry and blends across entries over 10 %. Add F.1.8 `LowPolyParams` (exported from `components/low-poly/types.ts`, owned by E, consumed by F): `assembly 0\u20131, fracture 0\u20131, cameraZ 0.9\u20131.2, lightAngle deg, lightTiltX/Y \u221212..12, layerX[3]/layerY[3] px, breath 0\u20131, dim 0\u20131, beam {t 0\u20131, variant, pathId}`; handle methods exactly `setStage(name, p)`, `set(partial: LowPolyParams)`, `setPointer(nx, ny)`, `setBeam(state)`, `redraw()`. Every F timeline writes only these keys."
+    },
+    {
+      "severity": "major",
+      "problem": "Performance holes behind the '60 fps on MEDIUM' promise. (1) No DPR cap: a full-viewport 2D canvas on a 412\u00d7915 CSS phone at DPR 2.6 is ~2.5 MP cleared and refilled 60\u00d7/s with hundreds of gradient facets; mid-range Androids will sit at 25\u201340 fps. (2) `registry.rebuild()` on profile change (`dependencies: [profile], revertOnUpdate`) rebuilds every pinned scene mid-scroll \u2192 visible jump; nothing says when a runtime demotion (\u00a727 'automatically adapt') may apply. (3) 'LOW: canvas loop at 30 fps' is unspecified; `gsap.ticker.fps(30)` would also halve every DOM tween.",
+      "fix": "(1) Canvas backing-store DPR = `min(devicePixelRatio, HIGH 2 / MEDIUM 1.5 / LOW 1)`; the hero's idle-only frames redraw at most the 3 layer groups that changed (dirty flags per layer). (2) Profile demotion is applied lazily: `intensity` is read live from `intensityRef` by the canvas and by `quickTo` amplitudes (no rebuild), facet counts and `.layer` caps change only in `SceneController.onEnter` of the next scene, and `registry.rebuild()` runs only when no trigger `isActive`. Governor: demote one step when the rolling 3 s mean frame time > 20 ms twice in a row; never promote mid-session. (3) 30 fps = frame skip inside the render callback (`if (t - last < 1000/30) return`), `gsap.ticker` untouched."
+    },
+    {
+      "severity": "major",
+      "problem": "F.7.2 timing assumes the detail surface exists at 120 ms, but `router.push('/features/[slug]')` with an intercepting route needs an RSC round-trip (100\u2013800 ms on mobile) before the modal mounts; the wipe and Flip cannot start on the schedule given. `Flip` across a route mount is also unspecified (state must be captured before the DOM changes and applied after the new DOM mounts).",
+      "fix": "Prefetch all 21 detail routes on universe `onEnter` (`router.prefetch`) and render the modal's content from `data/features.ts` (already client-side) so mount is synchronous after prefetch. On click: `registry.flipState = Flip.getState(iconEl + nameEl)`; play the 0\u2013120 ms dim as a hold that waits on `modalMounted`; the modal's `useGsap` runs `Flip.from(registry.flipState, { targets: '[data-flip-id]', duration: 0.52, ease: 'shakir.inOut' })` and starts the wipe. If mount has not happened by 400 ms, open with the 300 ms opacity fallback (same as direct load). Restate the timings as offsets from modal mount."
+    },
+    {
+      "severity": "major",
+      "problem": "Internal number conflicts a builder cannot resolve: F.2.3 caps 'DOM composited layers per pinned scene HIGH 8 / MEDIUM 6 / LOW 4', F.6.3 says '\u2264 3 `.layer` elements' per scene, F.6.6 says 'hard cap 12 promoted DOM layers alive at once' and 'LOW: DOM layers \u2264 4'. Hero pin is '150 vh desktop / 120 vh mobile' in F.4.5 but F.6.1 says mobile = desktop \u00d7 0.7 (= 105 vh). `D.slow` is 0.70 yet 'feature-detail wipe (0.52)' is squeezed into the same row.",
+      "fix": "Define two terms once: `.layer` = parallax transform group, max 3 per scene on HIGH/MEDIUM, 1 on LOW; `promoted element` = anything with `will-change` set by SceneController (layers + beams + clip-path surfaces), max 8 / 6 / 4 per scene and 12 page-wide. Delete the F.2.3 row's layer column. Hero mobile = 105 vh (or state the exception explicitly in F.6.1). Add `D.wipe = 0.52`."
+    },
+    {
+      "severity": "major",
+      "problem": "\u00a711 requires each feature to have a 'visual demonstration' and 'relevant animation' and 'relationship to other Shakir capabilities' in the detail. F.7 specifies only the open/close choreography and a beam trace; there is no contract for the 21 per-feature demos, so section G and the builders will scatter ad-hoc GSAP inside detail components, which \u00a728 forbids.",
+      "fix": "Add F.7.4 'Detail demo contract': one factory per feature in `animations/timelines/details/<slug>.ts` registered as `detail.<slug>`, signature identical to other factories, time-based, \u2264 4 s, plays once on open (after the 400\u2013760 ms content lines) and offers a 'Replay' button; budget per demo \u2264 6 tweens, \u2264 1 beam pass, no canvas; related-capability chips light via `feature.hover`'s connection style; reduced motion = the demo's final frame as a poster. Features that share a showcase (\u00a713\u2013\u00a720) reuse the showcase micro-timeline at 0.7 scale instead of a second demo."
+    },
+    {
+      "severity": "major",
+      "problem": "F.5.1/F.5.2 rely on a `<linearGradient gradientUnits=\"userSpaceOnUse\">` 'along the path with alpha stops so the tail fades to 0'. A linear gradient is a straight-line field in user space; it cannot follow a curved path, a rectangular outline (chat panel, device frame, CTA border) or the ShakirOne spokes in all directions, so the head/tail fade will be wrong on most of the F.5.4 placements.",
+      "fix": "Fake the fade with geometry, not paint: the three stacked paths each get their own `drawSVG` window offset behind the head (head 3 % at opacity 1.0, body 8 % at 0.7, tail 12 % at 0.25, all solid variant colour; colour along the length comes from a 3-stop gradient only on near-straight canvas/transition paths, where `userSpaceOnUse` is valid). Document the rule in `beamSpec.ts`: `gradient: 'straight-only'`. Head near-white `#F4F6FA` stays as a 4th 1.5 % segment."
+    },
+    {
+      "severity": "major",
+      "problem": "`SceneController.at(label, { enter, leave })` is the mechanism for all time-based typography (F.6.2) but its flick behaviour is undefined: a trackpad flick can move progress 0.2 \u2192 0.9 in one `onUpdate`, crossing three labels; `fastScrollEnd` (F.1.4) only affects ScrollTrigger's own toggle callbacks, not these custom events. Result: half-played text states, the exact thing the draft says `fastScrollEnd` prevents.",
+      "fix": "Specify: `onUpdate` walks every label between `prevProgress` and `progress` in direction order and fires each `enter`/`leave`; if `|\u0394progress| > 0.15` in one update, each child reveal is set with `progress(1)` (or `0` on reverse) instead of `play()`; `fastScrollEnd` is removed from the conventions table."
+    },
+    {
+      "severity": "minor",
+      "problem": "`shakir.beam` = `C0.55,0 0.15,1` is an ease-in-out (slow launch), which contradicts its stated 'fast launch, long decelerating tail'. `shakir.out` = `0.19,1,0.22,1` is the stock easeOutExpo found in every GSAP/Awwwards template.",
+      "fix": "`shakir.beam`: `M0,0 C0.08,0.72 0.3,1 1,1`. Give `shakir.out` a house curve with a slightly firmer arrival, e.g. `M0,0 C0.22,0.86 0.3,1 1,1`, and note the facet overshoot in `shakir.facet` is the only overshoot anywhere."
+    },
+    {
+      "severity": "minor",
+      "problem": "Beam rules contradict beam placements: `beamSpec.maxDwellMs = 2400` vs the 3 s Trust underline; 'pass duration clamped to 0.9\u20132.2 s' vs the 220 ms hover connection draw and 600 ms CTA trace; the registry test asserts on `beam.*` names but no `beam.*` timelines exist in F.1.2.",
+      "fix": "Trust underline 2.2 s. Add `mode: 'draw'` (short, \u2264 600 ms, no clamp, no halo) for connections and button traces; the 0.9\u20132.2 s clamp applies to `pass` only. Add `timelines/beam.timeline.ts` registering `beam.pass.<id>` / `beam.draw.<id>` and make `ShakirBeam` obtain its timelines through it."
+    },
+    {
+      "severity": "minor",
+      "problem": "Reduced-motion statements disagree: F.8.1 says 'opacity-only crossfades \u2264 400 ms triggered by user action are the only permitted motion' but F.3.5 uses a 600 ms non-user-triggered fade and F.8.1 itself crossfades posters on scroll. F.2.3 says 'durations never change across profiles' but LOW's intro is 1.6 s and its staggers are \u00d7 0.5.",
+      "fix": "Rule: 'Under REDUCED_MOTION the only motion is opacity-only fades \u2264 600 ms; no transforms, no autoplay loops, no scroll-scrub.' Rephrase F.2.3 as 'individual tween durations and eases never change across profiles; sequence length, counts, amplitude and stagger cadence do.'"
+    },
+    {
+      "severity": "minor",
+      "problem": "`setVar = gsap.quickSetter(root, '--scene-progress')` writes a custom property on the root every frame; nothing in the plan consumes it (the canvas reads the handle), and a root-level var write invalidates style for every consumer each frame.",
+      "fix": "Drop it, or write it on the scene's own root element and name the single consumer (e.g. a CSS `calc()` for the universe label rail). Keep the rule 'no per-frame CSS variable writes above the scene root'."
+    },
+    {
+      "severity": "minor",
+      "problem": "Naming/consistency leaks: `scroll/useSceneProgress.ts` and `hooks/useScrollProgress.ts` do the same job; the F.1.5 example `master.add(build('hero.exitUi'), 'exitUi')` adds the UI exit to the scrubbed master, contradicting F.4.5/F.6.2 where the UI exit is time-based via `at('exitUi')`; sub-factory names (`hero.exitUi`, `hero.fracture`, \u2026) are not listed anywhere.",
+      "fix": "Keep only `hooks/useScrollProgress(sceneId)`. Change the example to a geometry child: `master.add(build('hero.fracture', scope), 'fracture')`. Add a registry-name table per scene (`scene.hero` \u2192 `hero.fracture`, `hero.flipToNav`; `scene.one` \u2192 `one.nodes`, `one.connections`, `one.light`, `one.activate`, \u2026) so sections D/G/E reference the same keys."
+    },
+    {
+      "severity": "minor",
+      "problem": "FeatureUniverse snap labels are 'six world labels + center' but never named or placed; ShakirOne is given '8 node\u2192core paths' although the node count belongs to the ShakirOne data model. Other sections cannot line up with F.",
+      "fix": "Universe labels at progress: `center 0.00` (CHAT + SHAKIR ONE first \u2014 everything connects through it), `create 0.14`, `learn 0.30`, `build 0.46` (BUILD & GROW), `act 0.60`, `trust 0.74`, `human 0.86`, `centerReturn 1.00` (universe collapses back into the hub, leading into the engine). ShakirOne paths: `data/shakirOne.ts` node list drives path count; F only commits to 'one path per node, drawn in data order'."
+    },
+    {
+      "severity": "minor",
+      "problem": "Hero \u2192 nav Flip (F.4.5) uses `Flip.fit` with `invalidateOnRefresh`, but `Flip.fit` returns a tween with fixed values; after a resize the scrubbed logo lands in the wrong place.",
+      "fix": "`gsap.to(logo, { x: () => Flip.fit(logo, navSlot, { getVars: true }).x, y: () => \u2026, scale: () => \u2026, immediateRender: false })` inside the scrubbed child, so `invalidateOnRefresh` recomputes. On LOW/REDUCED the nav logo is `autoAlpha` crossfaded instead."
+    },
+    {
+      "severity": "minor",
+      "problem": "Pre-paint state script: setting `<html data-intro>` from a `beforeInteractive` inline script causes a React hydration attribute mismatch warning on `<html>`; and the user 'Reduce motion' toggle (localStorage) is read only after hydration, so a user who chose reduced motion sees the full-motion intro start before `REDUCED_MOTION` is resolved.",
+      "fix": "`<html suppressHydrationWarning>` (same pattern as next-themes). The inline script also reads `localStorage['shakir:motion']` and sets `data-motion=\"reduced\" | \"full\"`; CSS `html[data-motion=\"reduced\"]` applies the reduced-motion hero, and `IntroSequence` refuses to start when `data-motion === 'reduced'` or `matchMedia('(prefers-reduced-motion: reduce)').matches`."
+    },
+    {
+      "severity": "minor",
+      "problem": "F.4.6 mounts the canvas at `position: fixed; z-index: -1`, while shot 1 gives the 'hero background `#0A0B0E`'. If any section (hero included) carries an opaque background, or any ancestor creates a stacking context (transform, filter, `isolation`), the canvas is invisible or paints over content; the canvas also intercepts pointer events if not disabled.",
+      "fix": "Background colour lives on `html` only; sections are transparent by rule (lint via a stylelint check on `background` in `components/**`). Canvas: `pointer-events: none`, `z-index: 0` inside the story layout (`isolation: isolate`), content `z-index: 1`; the intro veil/z-order swap from the LCP fix lives in the same table."
+    },
+    {
+      "severity": "minor",
+      "problem": "Screen-reader treatment is unstated: feature `<button>`s contain icon + name + description so the accessible name becomes the whole paragraph; SplitText-split lines and scrubbed/typed chat text have no stated exposure; the canvas has no `aria-hidden`.",
+      "fix": "Buttons: `aria-labelledby={nameId} aria-describedby={descId}`. SplitText: rely on 3.13's default `aria: 'auto'` (parent gets `aria-label`, splits get `aria-hidden`) and assert it in `matrix.test.ts`. Chat demo: full conversation present in the DOM from mount, visual reveal only; no `aria-live` for scrubbed content. Canvas: `aria-hidden=\"true\"`; the ShakirOne SVG gets `role=\"img\"` + `aria-label` summarising the flow."
+    },
+    {
+      "severity": "minor",
+      "problem": "`gsap.matchMedia()` defines a `tablet` condition but no tablet decision exists anywhere in F (\u00a724 'preserve story while reducing complexity'); F.3.6 keys the mobile intro on '\u2264 767 px or `pointer: coarse`', which puts a 1024 px iPad into the mobile intro but the tablet scene lengths.",
+      "fix": "Rule: width decides composition (scene lengths \u00d7 0.85 on tablet, \u00d7 0.7 on mobile; intro variant by width), `pointer: coarse` decides input behaviour only (pointer response off, scrub 0.4, names always visible, press feedback). Tablet caps = MEDIUM profile caps regardless of detected profile."
+    },
+    {
+      "severity": "minor",
+      "problem": "Three choices read as stock template moves rather than Shakir: the CTA 'beam traces the button border on hover' is the ubiquitous animated-gradient-border button; headline reveals are the standard SplitText `y + opacity` stagger; shot 7's 'diagonal soft-white band' is the generic logo shimmer.",
+      "fix": "CTA: beam enters at the top-left corner, runs the top and right edges only and exits (a pass, never a loop), on `focus-visible` and the first hover per session only. Headlines: a single slanted-edge `clip-path: inset()` wipe (one facet edge, 20\u00b0) for H1/H2 lines, `y + opacity` only for body copy. Shot 7: the shot-5 beam's path ends by crossing the logo bounds so the 'light passes over logo' IS the Shakir beam head (same alpha gating), not a separate white band."
+    },
+    {
+      "severity": "minor",
+      "problem": "The F.8.2 matrix covers \u00a712\u2013\u00a721 but omits Skill AI (\u00a717, seven panels around a central skill) and the Live AI SEE \u2192 UNDERSTAND \u2192 GUIDE \u2192 AUTHORIZED ACTION \u2192 VERIFY sequence (\u00a720, only the LIVE indicator is listed); Code AI (\u00a716) is 'time-based at labels' although 5b sections are unpinned with no label mechanism.",
+      "fix": "Add rows: Skill AI \u2014 seven panels `autoAlpha` + 2 % scale-in, `each: 0.06`, around the centre, LOW opacity only, REDUCED all visible; Live AI \u2014 five steps light in sequence tied to the showcase's scrub progress at 0.15/0.35/0.55/0.75/0.9, 'AUTHORIZED ACTION' step shows the permission chip before the action lights. For 5b, give the unpinned scrub micro-timelines labels too (same `at()` API, trigger `start: 'top 80%', end: 'bottom 20%'`) so Code AI's steps are label-driven."
+    },
+    {
+      "severity": "minor",
+      "problem": "Under REDUCED_MOTION each scene 'becomes a normal 100 svh section showing its poster'; the universe (21 nodes with names), builder (three device frames) and ShakirOne cannot fit in 100 svh on a phone, so posters would overflow or clip.",
+      "fix": "`min-height: 100svh` with natural height; posters are laid out by the normal responsive grid, not forced to viewport height."
+    },
+    {
+      "severity": "minor",
+      "problem": "Navigation anchors and deep links into pinned scenes are unaddressed: `href=\"#features\"` lands at the pin spacer top (acceptable) but `#shakir-one` with snap, or a link to a specific world/label, has no defined behaviour; F.1.7 only clears scroll memory on route change.",
+      "fix": "Export `scrollToScene(id, label = 'start')` from `scroll/SceneController.tsx` (uses the same plain-object scroll tween as the keyboard fix); nav links call it with `preventDefault`; on load with a hash, resolve it after `ScrollTrigger.refresh()` and skip the intro."
+    }
+  ]
+}

@@ -1,38 +1,53 @@
-# Aurelia — a luxury, scroll-driven landing page for an AI product
+# Shakir AI — official website (demo build)
 
-A cinematic single-page website for **Aurelia**, a fictional private AI operating layer.
-Built with plain HTML, CSS and JavaScript — no frameworks, no build step, no runtime dependencies.
+A cinematic, scroll-driven marketing site for **Shakir AI**: one intelligent system that connects creation,
+learning, research, building, automation and action. Built from `docs/shakir-website-brief.md`.
 
-## Highlights
+## What is in the demo
 
-- **Scroll-scrubbed cinematic sequence** — a pinned, full-screen canvas "film" that you scrub by scrolling.
-  1,728 particles morph through four chapters (scatter → sphere → torus → lattice → wave) with a
-  timecode, chapter timeline and captions, like a scroll-controlled video.
-- **Hero neural orb** — a rotating particle sphere with orbit rings that reacts to the mouse and dissolves as you scroll.
-- **Horizontal gallery** — a pinned section that slides four product panels sideways as you scroll down.
-- **Word-by-word manifesto reveal**, animated counters, magnetic buttons, 3D tilt pricing cards,
-  custom cursor, film grain, preloader with counter, and a nav that hides on scroll.
-- **Inertia smoothing** on every scrubbed animation for a weighty, luxurious feel.
-- Respects `prefers-reduced-motion`; works on touch devices; responsive from phones to wide desktops.
+- **Low-poly environment** — one persistent Canvas 2D scene (`src/lowpoly/`) behind the whole page. Every scene is a
+  blend between two named states (ridge → fracture → network → interface → universe → engine → one → calm → collapse → symbol),
+  driven by scroll. Facets are generated from a seeded Delaunay mesh; the palette is measured from the logo.
+- **Opening cinematic** (3.2 s, skippable, once per session) that assembles the hero's own environment.
+- **Scroll storytelling** — pinned, scrubbed scenes (`src/animations/scroll/useScene.ts`) with one master timeline each.
+- **Shakir Beam** — the travelling light motif on the canvas and on SVG surfaces (`src/animations/beam/`).
+- **Feature universe** — the 21 capabilities as six constellations with hover/focus/keyboard navigation and a
+  detail dialog; vertical world bands on phones.
+- **Creation engine** — nine demonstrations (Chat, Website Builder, Code, Image, Video, Skill, Business, Automation,
+  Live AI), scrubbed on desktop, autoplayed on touch, stepped under reduced motion.
+- **Shakir One**, **Trust**, **Final CTA** and footer.
+- Performance profiles HIGH / MEDIUM / LOW / REDUCED_MOTION chosen by device heuristics and a runtime frame-time probe.
 
-## Run it
+All product scenarios are illustrative; copy follows the brief's content rule.
 
-Open `index.html` directly in a browser, or serve the folder:
+## Run
 
 ```bash
-npx serve .
-# or
-python3 -m http.server 8080
+npm install
+npm run dev        # http://localhost:5173
+npm run build      # static output in dist/ (relative asset paths; host anywhere)
+npm run preview
 ```
 
-Everything is static, so it can be hosted on GitHub Pages, Netlify, Vercel or any file host.
+Quality gate: `npm run check` (typecheck, lint, unit tests, build) and `npm run test:e2e` (Playwright, desktop + mobile, axe).
+
+Developer aids: `/?intro=1` replays the intro; `/?demo=code&step=3` renders one demonstration at a step;
+`node scripts/shot-page.mjs <dir>` and `node scripts/shot-demo.mjs <key> <dir>` capture screenshots.
 
 ## Structure
 
 ```
-index.html            page markup and copy
-assets/css/styles.css design system, layout, reveal transitions
-assets/js/main.js     scroll engine: canvas sequences, pinned sections, interactions
+src/
+  animations/   motion provider, GSAP setup, scroll scene controller, beam
+  components/   brand, navigation, hero, scenes, features, demonstrations, shakir-one, trust, cta, footer
+  data/         features (21), worlds, demos, navigation, copy, examples
+  hooks/        reduced motion, media queries, gsap context, intro gate
+  lowpoly/      engine, states, layout, palette, React provider
+  styles/       Tailwind v4 tokens
+docs/           brief, planning drafts, demo contract
+brand/          logo source;  public/brand/  keyed-out logo in four sizes
+prototypes/     earlier Aurelia prototype (unrelated to Shakir)
 ```
 
-Typography is loaded from Google Fonts (Cormorant Garamond + Manrope); the page falls back to system fonts offline.
+The Next.js version of this architecture is described in `docs/plan-drafts/`; this demo uses Vite + React so it can be
+deployed as plain static files.
